@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Pricing Monitor Architecture</title>
+<style>
+  :root {
+    --bg: #f6f6f3; --fg: #1d1d1f; --muted: #66666d; --card: #ffffff; --line: #dcdce0;
+    --arrow: #55555c; --accent: #d9480f; --on-accent: #ffffff;
+    --c1: #2563eb; --c2: #7c3aed; --c3: #0d9488; --c4: #b45309; --c5: #be123c; --c6: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131315; --fg: #ececef; --muted: #9c9ca4; --card: #1c1c20; --line: #34343b;
+      --arrow: #a3a3ab; --accent: #ff8a4c; --on-accent: #1a0d05;
+      --c1: #60a5fa; --c2: #a78bfa; --c3: #2dd4bf; --c4: #fbbf24; --c5: #fb7185; --c6: #4ade80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131315; --fg: #ececef; --muted: #9c9ca4; --card: #1c1c20; --line: #34343b;
+    --arrow: #a3a3ab; --accent: #ff8a4c; --on-accent: #1a0d05;
+    --c1: #60a5fa; --c2: #a78bfa; --c3: #2dd4bf; --c4: #fbbf24; --c5: #fb7185; --c6: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1480px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 40px 0 12px; }
+  p.lede { color: var(--muted); margin: 0 0 20px; max-width: 900px; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .diagram { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+             overflow-x: auto; padding: 8px; }
+  .diagram svg { display: block; min-width: 1100px; width: 100%; height: auto; }
+
+  /* SVG */
+  .lane > rect { fill: color-mix(in srgb, var(--k) 5%, var(--card)); stroke: color-mix(in srgb, var(--k) 35%, var(--line)); }
+  .lt { font: 700 11px system-ui, sans-serif; letter-spacing: .08em; fill: var(--k); text-anchor: middle; }
+  .node > rect { fill: color-mix(in srgb, var(--k) 11%, var(--card)); stroke: var(--k); stroke-width: 1.4; }
+  .node.opt > rect { stroke-dasharray: 5 4; }
+  .node.note > rect { fill: none; stroke: var(--line); stroke-dasharray: 3 3; }
+  .t { font: 600 13px system-ui, sans-serif; fill: var(--fg); text-anchor: middle; }
+  .s { font: 11.5px system-ui, sans-serif; fill: var(--muted); text-anchor: middle; }
+  .m { font: 11px ui-monospace, Menlo, monospace; fill: var(--fg); text-anchor: middle; }
+  .tag { font: 600 10.5px system-ui, sans-serif; text-anchor: middle; }
+  .edge { fill: none; stroke: var(--arrow); stroke-width: 1.6; marker-end: url(#ah); }
+  .edge.both { marker-start: url(#ahs); }
+  .edge.async { stroke-dasharray: 6 4; }
+  .edge.alert { stroke: var(--accent); stroke-width: 2; marker-end: url(#aha); }
+  .el { font: 10.5px system-ui, sans-serif; fill: var(--muted); paint-order: stroke;
+        stroke: var(--card); stroke-width: 4px; stroke-linejoin: round; }
+  .el.a { fill: var(--accent); font-weight: 600; }
+  .bus > rect.bar { fill: color-mix(in srgb, var(--k) 14%, var(--card)); stroke: var(--k); stroke-width: 1.6; }
+  .chip rect { fill: var(--card); stroke: var(--k); }
+  .chip text { font: 10.5px ui-monospace, Menlo, monospace; fill: var(--fg); text-anchor: middle; }
+  .badge circle { fill: var(--accent); }
+  .badge text { font: 700 11px system-ui, sans-serif; fill: var(--on-accent); text-anchor: middle; }
+  .mk { fill: var(--arrow); } .mka { fill: var(--accent); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 12px 4px 0; color: var(--muted); font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .legend svg { width: 34px; height: 10px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 15px; display: flex; gap: 10px; align-items: center; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .card .vs { margin-top: 8px; font-size: 13px; color: var(--fg); }
+  .card .vs b { color: var(--muted); font-weight: 600; }
+  .pill { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+          display: inline-grid; place-items: center; font-size: 12px; font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line);
+          border-radius: 12px; overflow: hidden; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  tr:last-child td { border-bottom: 0; }
+  .tbl { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Smart Pricing Monitor — system architecture</h1>
+  <p class="lede">Crowdsourced grocery prices that answer one question in under a second:
+    <em>“Is the price I’m being quoted right now fair?”</em> The system separates three causes of an unusual
+    price (a bad report, an overpriced shop, or a market-wide shift) before alerting anyone.
+    Orange badges <b>A–G</b> mark what sets it apart from a typical price tracker; they’re explained below the diagram.</p>
+
+  <div class="diagram">
+  <svg viewBox="0 50 1460 690" role="img" aria-label="Architecture: React PWA client, API Gateway and FastAPI on Lambda, synchronous ingest path with normalizer and guardrails, PostgreSQL and Redis data layer, asynchronous intelligence layer with trust engine, anomaly classifier and fair-price band, EventBridge backbone, and delivery through SNS alerts and a daily digest.">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+      <marker id="ahs" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M10,0 L0,5 L10,10 z"/></marker>
+      <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mka" d="M0,0 L10,5 L0,10 z"/></marker>
+    </defs>
+
+    <!-- 1 · CLIENT -->
+    <g class="lane" style="--k:var(--c1)">
+      <rect x="20" y="60" width="215" height="530" rx="14"/>
+      <text class="lt" x="127.5" y="82">1 · CLIENT</text>
+      <g class="node"><rect x="32" y="100" width="191" height="370" rx="12"/>
+        <text class="t" x="127.5" y="124">React PWA</text>
+        <text class="s" x="127.5" y="141">offline-first · IndexedDB queue</text></g>
+      <g class="node"><rect x="44" y="156" width="167" height="88" rx="9"/>
+        <text class="t" x="127.5" y="180">① Price Check</text>
+        <text class="s" x="127.5" y="198">“Is this quote fair?”</text>
+        <text class="s" x="127.5" y="214">fair · high · suspicious</text>
+        <text class="s" x="127.5" y="230">+ cheaper option nearby</text></g>
+      <g class="node"><rect x="44" y="256" width="167" height="88" rx="9"/>
+        <text class="t" x="127.5" y="280">② Report a Price</text>
+        <text class="s" x="127.5" y="298">item · shop · price · unit</text>
+        <text class="s" x="127.5" y="314">GPS + optional receipt</text>
+        <text class="s" x="127.5" y="330">works offline, syncs later</text></g>
+      <g class="node"><rect x="44" y="356" width="167" height="100" rx="9"/>
+        <text class="t" x="127.5" y="380">③ Compare &amp; Trends</text>
+        <text class="s" x="127.5" y="398">cheapest verified nearby</text>
+        <text class="s" x="127.5" y="414">7 / 30-day trend</text>
+        <text class="s" x="127.5" y="430">freshness shown on</text>
+        <text class="s" x="127.5" y="446">every number</text></g>
+      <g class="node"><rect x="32" y="490" width="191" height="70" rx="12"/>
+        <text class="t" x="127.5" y="517">Alerts inbox</text>
+        <text class="s" x="127.5" y="535">web-push · email</text></g>
+    </g>
+
+    <!-- 2 · EDGE & API -->
+    <g class="lane" style="--k:var(--c2)">
+      <rect x="257" y="60" width="215" height="530" rx="14"/>
+      <text class="lt" x="364.5" y="82">2 · EDGE &amp; API</text>
+      <g class="node"><rect x="269" y="100" width="191" height="72" rx="10"/>
+        <text class="t" x="364.5" y="124">API Gateway</text>
+        <text class="s" x="364.5" y="142">JWT · throttling · WAF</text>
+        <text class="s" x="364.5" y="158">per-device rate limit</text></g>
+      <g class="node"><rect x="269" y="190" width="191" height="270" rx="10"/>
+        <text class="t" x="364.5" y="214">FastAPI on Lambda</text>
+        <text class="s" x="364.5" y="231">Mangum adapter · stateless</text>
+        <text class="m" x="364.5" y="260">POST /reports</text>
+        <text class="m" x="364.5" y="278">GET  /check</text>
+        <text class="m" x="364.5" y="296">GET  /compare</text>
+        <text class="m" x="364.5" y="314">GET  /trends/{item}</text>
+        <text class="m" x="364.5" y="332">POST /subscriptions</text>
+        <text class="s" x="364.5" y="372">most traffic is reads:</text>
+        <text class="s" x="364.5" y="388">served from Redis,</text>
+        <text class="s" x="364.5" y="404">never touches Postgres</text></g>
+      <g class="node note"><rect x="269" y="482" width="191" height="78" rx="10"/>
+        <text class="t" x="364.5" y="504">Latency budget</text>
+        <text class="m" x="364.5" y="526">/check   p95 &lt; 50 ms</text>
+        <text class="m" x="364.5" y="544">/reports p95 &lt; 100 ms</text></g>
+    </g>
+
+    <!-- 3 · INGEST -->
+    <g class="lane" style="--k:var(--c3)">
+      <rect x="494" y="60" width="215" height="530" rx="14"/>
+      <text class="lt" x="601.5" y="82">3 · INGEST (SYNC)</text>
+      <g class="node"><rect x="506" y="100" width="191" height="80" rx="10"/>
+        <text class="t" x="601.5" y="124">Normalizer</text>
+        <text class="s" x="601.5" y="142">unit → per kg · per dozen</text>
+        <text class="s" x="601.5" y="158">alias: “piyaz” → onion</text></g>
+      <g class="node"><rect x="506" y="220" width="191" height="110" rx="10"/>
+        <text class="t" x="601.5" y="244">Guardrails</text>
+        <text class="s" x="601.5" y="262">geo-fence: ≤ 300 m of shop</text>
+        <text class="s" x="601.5" y="278">dedupe · burst limit</text>
+        <text class="s" x="601.5" y="294">hard sanity bounds per item</text>
+        <text class="s" x="601.5" y="310">unit-error hints (×2, ×12)</text></g>
+    </g>
+
+    <!-- 4 · DATA -->
+    <g class="lane" style="--k:var(--c4)">
+      <rect x="731" y="60" width="215" height="530" rx="14"/>
+      <text class="lt" x="838.5" y="82">4 · DATA</text>
+      <g class="node"><rect x="743" y="100" width="191" height="120" rx="10"/>
+        <text class="t" x="838.5" y="124">Redis · hot layer</text>
+        <text class="s" x="838.5" y="142">fair band per item × area</text>
+        <text class="s" x="838.5" y="158">cheapest-nearby sorted set</text>
+        <text class="s" x="838.5" y="174">rate-limit counters</text>
+        <text class="s" x="838.5" y="190">TTL = freshness window</text></g>
+      <g class="node"><rect x="743" y="240" width="191" height="190" rx="10"/>
+        <text class="t" x="838.5" y="264">PostgreSQL + PostGIS</text>
+        <text class="s" x="838.5" y="281">source of truth</text>
+        <text class="m" x="838.5" y="306">products · shops(geo)</text>
+        <text class="m" x="838.5" y="322">reports (append-only)</text>
+        <text class="m" x="838.5" y="338">reporters (trust)</text>
+        <text class="m" x="838.5" y="354">price_stats_daily</text>
+        <text class="m" x="838.5" y="370">anomalies</text>
+        <text class="s" x="838.5" y="400">reports partitioned</text>
+        <text class="s" x="838.5" y="416">by month</text></g>
+      <g class="node opt"><rect x="743" y="450" width="191" height="70" rx="10"/>
+        <text class="t" x="838.5" y="476">S3 (optional)</text>
+        <text class="s" x="838.5" y="494">receipt photos · exports</text></g>
+    </g>
+
+    <!-- 5 · INTELLIGENCE -->
+    <g class="lane" style="--k:var(--c5)">
+      <rect x="968" y="60" width="215" height="530" rx="14"/>
+      <text class="lt" x="1075.5" y="82">5 · INTELLIGENCE (ASYNC)</text>
+      <g class="node"><rect x="980" y="100" width="191" height="76" rx="10"/>
+        <text class="t" x="1075.5" y="122">Fair-price band</text>
+        <text class="s" x="1075.5" y="140">freshness-weighted median</text>
+        <text class="s" x="1075.5" y="156">half-life set by volatility</text></g>
+      <g class="node"><rect x="980" y="196" width="191" height="96" rx="10"/>
+        <text class="t" x="1075.5" y="218">Trust engine</text>
+        <text class="s" x="1075.5" y="236">reputation ~ Beta(α, β)</text>
+        <text class="s" x="1075.5" y="252">≥ 2 independent reports</text>
+        <text class="s" x="1075.5" y="268">→ VERIFIED price</text></g>
+      <g class="node"><rect x="980" y="322" width="191" height="150" rx="10"/>
+        <text class="t" x="1075.5" y="344">Anomaly classifier</text>
+        <text class="s" x="1075.5" y="361">3-way: who is wrong?</text>
+        <text class="s" x="1075.5" y="378">robust z = (p − med) / MAD</text>
+        <text class="s" x="1075.5" y="394">vs shop history &amp; area</text>
+        <text class="tag" x="1075.5" y="420" style="fill:var(--muted)">BAD_REPORT → quarantine</text>
+        <text class="tag" x="1075.5" y="438" style="fill:var(--accent)">SHOP_OUTLIER → alert</text>
+        <text class="tag" x="1075.5" y="456" style="fill:var(--accent)">MARKET_SHIFT → alert</text></g>
+      <g class="node"><rect x="980" y="500" width="191" height="60" rx="10"/>
+        <text class="t" x="1075.5" y="524">Scoring worker</text>
+        <text class="s" x="1075.5" y="542">Lambda · SQS batch + DLQ</text></g>
+    </g>
+
+    <!-- 6 · DELIVERY & OPS -->
+    <g class="lane" style="--k:var(--c6)">
+      <rect x="1205" y="60" width="215" height="530" rx="14"/>
+      <text class="lt" x="1312.5" y="82">6 · DELIVERY &amp; OPS</text>
+      <g class="node"><rect x="1217" y="100" width="191" height="100" rx="10"/>
+        <text class="t" x="1312.5" y="124">CloudWatch dashboard</text>
+        <text class="s" x="1312.5" y="142">price gaps detected</text>
+        <text class="s" x="1312.5" y="158">report freshness (age)</text>
+        <text class="s" x="1312.5" y="174">potential savings</text></g>
+      <g class="node"><rect x="1217" y="220" width="191" height="70" rx="10"/>
+        <text class="t" x="1312.5" y="244">EventBridge Scheduler</text>
+        <text class="s" x="1312.5" y="262">cron 07:00 daily</text></g>
+      <g class="node"><rect x="1217" y="310" width="191" height="80" rx="10"/>
+        <text class="t" x="1312.5" y="334">Daily digest Lambda</text>
+        <text class="s" x="1312.5" y="352">top movers · stale items</text>
+        <text class="s" x="1312.5" y="368">best-value shop per item</text></g>
+      <g class="node"><rect x="1217" y="470" width="191" height="90" rx="10"/>
+        <text class="t" x="1312.5" y="494">SNS alert topics</text>
+        <text class="m" x="1312.5" y="514">alerts.{item}.{area}</text>
+        <text class="s" x="1312.5" y="532">6 h dedup · quiet hours</text></g>
+    </g>
+
+    <!-- Event backbone -->
+    <g class="bus" style="--k:var(--c3)">
+      <rect class="bar" x="494" y="600" width="926" height="56" rx="12"/>
+      <text class="t" x="512" y="624" style="text-anchor:start">EventBridge bus</text>
+      <text class="s" x="512" y="642" style="text-anchor:start">decouples writes from scoring</text>
+      <g class="chip"><rect x="730" y="616" width="108" height="24" rx="12"/><text x="784" y="632">price.reported</text></g>
+      <g class="chip"><rect x="848" y="616" width="124" height="24" rx="12"/><text x="910" y="632">anomaly.detected</text></g>
+      <g class="chip"><rect x="1122" y="616" width="100" height="24" rx="12"/><text x="1172" y="632">band.updated</text></g>
+      <g class="chip"><rect x="1232" y="616" width="56" height="24" rx="12"/><text x="1260" y="632">tick</text></g>
+    </g>
+
+    <!-- Edges -->
+    <path class="edge" d="M223,140 H269"/>
+    <text class="el" x="246" y="132" text-anchor="middle">HTTPS</text>
+    <path class="edge" d="M364.5,172 V190"/>
+    <path class="edge" d="M460,230 H476 V140 H506"/>
+    <text class="el" x="491" y="132" text-anchor="middle">write</text>
+    <path class="edge" d="M460,290 H490 V200 H743"/>
+    <text class="el" x="610" y="195">read (cache-aside)</text>
+    <path class="edge" d="M601.5,180 V220"/>
+    <path class="edge" d="M697,285 H743"/>
+    <text class="el" x="720" y="278" text-anchor="middle">INSERT</text>
+    <path class="edge async" d="M601.5,330 V600"/>
+    <text class="el" x="610" y="470">emit</text>
+
+    <path class="edge" d="M980,138 H934"/>
+    <text class="el" x="957" y="131" text-anchor="middle">SET</text>
+    <path class="edge both" d="M980,250 H934"/>
+    <text class="el" x="957" y="243" text-anchor="middle">R/W</text>
+    <path class="edge both" d="M980,392 H934"/>
+    <text class="el" x="957" y="385" text-anchor="middle">R/W</text>
+
+    <path class="edge" d="M1075.5,196 V176"/>
+    <path class="edge" d="M1050,322 V292"/>
+    <path class="edge" d="M1101,292 V322"/>
+    <path class="edge" d="M1075.5,500 V472"/>
+    <path class="edge async" d="M1050,600 V560"/>
+    <path class="edge async" d="M1101,560 V600"/>
+
+    <path class="edge" d="M1312.5,290 V310"/>
+    <path class="edge" d="M1312.5,390 V470"/>
+    <text class="el" x="1320" y="434">summary</text>
+    <path class="edge async" d="M1312.5,600 V560"/>
+
+    <path class="edge alert" d="M1408,515 H1440 V712 H127.5 V560"/>
+    <text class="el a" x="780" y="704" text-anchor="middle">alert: “Onions +38% at Shop X vs area median (3 verified reports)”</text>
+
+    <!-- Differentiator badges -->
+    <g class="badge"><circle cx="198" cy="169" r="9"/><text x="198" y="173">A</text></g>
+    <g class="badge"><circle cx="684" cy="113" r="9"/><text x="684" y="117">B</text></g>
+    <g class="badge"><circle cx="684" cy="233" r="9"/><text x="684" y="237">C</text></g>
+    <g class="badge"><circle cx="1158" cy="209" r="9"/><text x="1158" y="213">D</text></g>
+    <g class="badge"><circle cx="1158" cy="335" r="9"/><text x="1158" y="339">E</text></g>
+    <g class="badge"><circle cx="1158" cy="113" r="9"/><text x="1158" y="117">F</text></g>
+    <g class="badge"><circle cx="921" cy="113" r="9"/><text x="921" y="117">G</text></g>
+    <g class="badge"><circle cx="1405" cy="613" r="9"/><text x="1405" y="617">G</text></g>
+  </svg>
+  </div>
+  <div class="legend">
+    <span><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--arrow)" stroke-width="1.6"/></svg>synchronous call</span>
+    <span><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--arrow)" stroke-width="1.6" stroke-dasharray="6 4"/></svg>asynchronous event</span>
+    <span><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--accent)" stroke-width="2"/></svg>alert to user</span>
+    <span>dashed box = optional in MVP</span>
+  </div>
+
+  <h2>What makes it different</h2>
+  <div class="cards">
+    <div class="card"><h3><span class="pill">A</span>A fair-price verdict, not just a price list</h3>
+      <p>The main screen takes the price you were just quoted and returns <b>fair / high / suspicious</b>, the verified fair range, how fresh the data is, and the cheapest verified shop nearby with the saving.</p>
+      <p class="vs"><b>Typical tracker:</b> shows a table of past prices and leaves the judgement to you.</p></div>
+    <div class="card"><h3><span class="pill">B</span>Unit-normalized prices</h3>
+      <p>“500 g for 40”, “1 kg for 75”, “a tray of 30 eggs” are converted to one base unit (per kg, per dozen) before comparison, and local names map to one product.</p>
+      <p class="vs"><b>Typical tracker:</b> compares raw numbers, so a pack-size difference looks like a price jump.</p></div>
+    <div class="card"><h3><span class="pill">C</span>Guardrails at the door</h3>
+      <p>A report must come from within about 300 m of the shop, is de-duplicated and rate-limited, and is checked against per-item sanity bounds. Likely unit mistakes (×2, ×12) get a “did you mean…?” hint.</p>
+      <p class="vs"><b>Typical tracker:</b> accepts every input and cleans it up later, if at all.</p></div>
+    <div class="card"><h3><span class="pill">D</span>Trust-weighted consensus</h3>
+      <p>Each reporter has a reputation that rises when later reports confirm theirs and falls when reports contradict them. A price is shown as <b>VERIFIED</b> only after two independent reports, or one from a highly trusted reporter.</p>
+      <p class="vs"><b>Typical tracker:</b> one user, one vote, and the last report wins.</p></div>
+    <div class="card"><h3><span class="pill">E</span>A 3-way anomaly classifier</h3>
+      <p>An unusual price has one of three causes: the <b>report</b> is wrong, the <b>shop</b> is overcharging, or the whole <b>market</b> has moved (an onion price shock, for example). The system tells them apart, so users get alerts only for the last two and real market moves don’t flag every shop.</p>
+      <p class="vs"><b>Typical tracker:</b> a single threshold that flags the market shift at every shop and lets bad data through.</p></div>
+    <div class="card"><h3><span class="pill">F</span>Freshness decay</h3>
+      <p>Every report loses weight over time with a half-life set by how volatile the item is (onions change faster than rice). If there is no recent data, the app says “stale” instead of presenting an old number as current.</p>
+      <p class="vs"><b>Typical tracker:</b> a 3-week-old price looks exactly like today’s.</p></div>
+    <div class="card"><h3><span class="pill">G</span>Efficient by design</h3>
+      <p>The write path does only cheap, constant-time work and emits an event. Scoring runs asynchronously and recomputes only the affected <code>item × area</code>. Reads are served from precomputed Redis bands, and with serverless parts the system costs close to nothing while idle.</p>
+      <p class="vs"><b>Typical tracker:</b> runs aggregate SQL on every page view, or a batch job over all data every night.</p></div>
+  </div>
+
+  <h2>How the anomaly classifier decides</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Check (on normalized price <code>p</code>)</th><th>Result</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>Outside hard bounds (&lt; 0.2× or &gt; 5× the 90-day area median)</td><td><b>BAD_REPORT</b></td><td>Quarantine it, suggest a unit fix, lower the reporter’s trust slightly</td></tr>
+      <tr><td>≥ 3 shops in the area moved the same way (|z<sub>shop</sub>| &gt; 3) within 48 h</td><td><b>MARKET_SHIFT</b></td><td>Re-base the fair band and send one area-wide alert, not one per shop</td></tr>
+      <tr><td>|z<sub>market</sub>| &gt; 3 against other shops, and corroborated (≥ 2 independent reports or 1 high-trust report)</td><td><b>SHOP_OUTLIER</b></td><td>Alert subscribers and suggest the cheaper verified shop</td></tr>
+      <tr><td>|z| &gt; 3 from a single uncorroborated report</td><td><b>PENDING</b></td><td>Don’t alert yet: confirmation promotes it, contradiction turns it into BAD_REPORT</td></tr>
+      <tr><td>Otherwise</td><td><b>NORMAL</b></td><td>Update the band, the trend and the reporter’s trust</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lede" style="margin-top:10px">z = (p − median) / (1.4826 · MAD). Median and MAD are robust statistics, so a few bad reports can’t drag the baseline. This needs no ML infrastructure in the MVP; SageMaker or Isolation Forest is an upgrade for when there is enough data.</p>
+
+  <h2>Two hot paths</h2>
+  <div class="cards">
+    <div class="card"><h3>Report a price (write)</h3>
+      <p>PWA → API Gateway → <code>POST /reports</code> → Normalizer → Guardrails → <code>INSERT</code> (append-only) → emit <code>price.reported</code> → <b>202 Accepted</b>. Then, asynchronously: SQS → Scoring worker → Trust + Classifier → update the Redis band → <code>anomaly.detected</code> → SNS.</p></div>
+    <div class="card"><h3>Check a quote (read)</h3>
+      <p>PWA → <code>GET /check?item=onion&amp;price=95&amp;shop=s3</code> → Redis lookup for the band and cheapest-nearby set → verdict with confidence and freshness. Postgres is used only on a cache miss.</p></div>
+  </div>
+</main>
+</body>
+</html>
