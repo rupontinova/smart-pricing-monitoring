@@ -1,0 +1,8 @@
+# PLACEHOLDER DATA — coordinates are synthetic points 300–1500 m from the demo-central centre
+# (N 300 m, E 600 m, S 900 m, W 1200 m, NE 1500 m). Replace with real shops and locations.
+shops:
+  - {id: shop-a, name: Shop A, area_id: demo-central, location: {lat: 23.783498, lng: 90.4073},   address: "Placeholder address A"}
+  - {id: shop-b, name: Shop B, area_id: demo-central, location: {lat: 23.7808,   lng: 90.413197}, address: "Placeholder address B"}
+  - {id: shop-c, name: Shop C, area_id: demo-central, location: {lat: 23.772706, lng: 90.4073},   address: "Placeholder address C"}
+  - {id: shop-d, name: Shop D, area_id: demo-central, location: {lat: 23.7808,   lng: 90.395507}, address: "Placeholder address D"}
+  - {id: shop-e, name: Shop E, area_id: demo-central, location: {lat: 23.790339, lng: 90.417724}, address: "Placeholder address E"}

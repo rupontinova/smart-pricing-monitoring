@@ -1,13 +1,18 @@
 """The ``spm`` command."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 import uvicorn
 
 import spm
-from spm.config import get_settings
+from spm.config import Settings, get_settings
 from spm.logging import configure_logging
+
+if TYPE_CHECKING:
+    from spm.adapters.catalog_yaml import SeedCatalog
+    from spm.adapters.postgres.catalog_seed import SeedReport
 
 app = typer.Typer(name="spm", help="Smart Pricing Monitor", no_args_is_help=True)
 
@@ -66,6 +71,41 @@ def migrate(
 
 
 @app.command()
-def seed() -> None:
-    """Load catalog seeds."""
-    _not_implemented("seed", "M04")
+def seed(
+    seeds_dir: Annotated[
+        Path | None,
+        typer.Option("--dir", help="Directory with areas.yaml, products.yaml, shops.yaml."),
+    ] = None,
+) -> None:
+    """Upsert the catalog seeds into Postgres and rebuild the Redis shop geo index."""
+    import asyncio
+
+    from spm.adapters.catalog_yaml import SEEDS_DIR, SeedError, load_catalog
+
+    settings = get_settings()
+    configure_logging(settings)
+    try:
+        catalog = load_catalog(seeds_dir or SEEDS_DIR)
+    except SeedError as exc:
+        typer.echo(f"Invalid seed files: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    report = asyncio.run(_seed(settings, catalog))
+    typer.echo(
+        f"Seeded {report.areas} areas, {report.products} products, {report.aliases} aliases, "
+        f"{report.shops} shops; {report.geo_shops} shops in the geo index."
+    )
+
+
+async def _seed(settings: Settings, catalog: "SeedCatalog") -> "SeedReport":
+    from spm.adapters.postgres.catalog_seed import seed_catalog
+    from spm.adapters.postgres.db import make_engine, make_session_factory
+    from spm.adapters.redis.hot_cache import RedisHotCache
+    from spm.container import make_redis
+
+    engine = make_engine(settings)
+    redis = make_redis(settings.redis_url)
+    try:
+        return await seed_catalog(catalog, make_session_factory(engine), RedisHotCache(redis))
+    finally:
+        await redis.aclose()
+        await engine.dispose()

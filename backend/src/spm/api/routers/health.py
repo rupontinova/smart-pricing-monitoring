@@ -28,12 +28,10 @@ async def healthz() -> HealthOut:
     responses={503: {"description": "A configured dependency is down"}},
 )
 async def readyz(container: ContainerDep) -> ReadyOut | JSONResponse:
-    settings = container.settings
-    engine = container.db_engine
+    engine, redis = container.db_engine, container.redis
     probes: dict[str, Callable[[], Awaitable[None]] | None] = {
         "db": (lambda: ping_engine(engine)) if engine is not None else None,
-        # Redis has no shared client yet (M06/M07); probe the URL with a one-shot connection.
-        "redis": (lambda: ping_redis(settings.redis_url)) if settings.redis_url else None,
+        "redis": (lambda: ping_redis(redis)) if redis is not None else None,
     }
     configured = {name: probe for name, probe in probes.items() if probe is not None}
     results = await asyncio.gather(

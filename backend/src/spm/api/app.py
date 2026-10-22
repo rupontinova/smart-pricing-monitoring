@@ -3,6 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,24 +16,43 @@ from spm.api.middleware import (
     ServerTimingMiddleware,
     UnhandledErrorMiddleware,
 )
-from spm.api.routers import health
+from spm.api.routers import catalog, health
 from spm.config import Settings, get_settings
-from spm.container import build_container
+from spm.container import Container, build_container
 from spm.logging import configure_logging
 
+log = structlog.get_logger("spm.api")
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or get_settings()
+
+async def warm_up(container: Container) -> None:
+    """Best-effort startup work: load the catalog and rebuild ``spm:geo:shops`` (§3.2).
+
+    Failures are logged, not raised, so the API still starts (``/readyz`` reports the outage).
+    """
+    if container.catalog is None or container.shop_geo is None:
+        return
+    try:
+        await container.catalog.ensure_fresh()
+        await container.shop_geo.load_shop_geo(container.catalog.shops())
+    except Exception:
+        log.warning("startup_warmup_failed", exc_info=True)
+
+
+def create_app(settings: Settings | None = None, *, container: Container | None = None) -> FastAPI:
+    """Build the app. A pre-built ``container`` (tests) is used as-is and not closed by the app."""
+    settings = settings or (container.settings if container else get_settings())
     configure_logging(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        container = await build_container(settings)
-        app.state.container = container
+        owned = container is None
+        app.state.container = await build_container(settings) if owned else container
+        await warm_up(app.state.container)
         try:
             yield
         finally:
-            await container.close()
+            if owned:
+                await app.state.container.close()
 
     app = FastAPI(title="Smart Pricing Monitor", version=__version__, lifespan=lifespan)
     app.state.settings = settings
@@ -53,4 +73,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
 
     app.include_router(health.router)
+    app.include_router(catalog.router)
     return app

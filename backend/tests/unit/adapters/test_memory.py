@@ -70,3 +70,14 @@ def test_memory_adapters_satisfy_ports() -> None:
     limiter: RateLimiter = MemoryRateLimiter(clock)
     metrics: Metrics = MemoryMetrics()
     assert all(x is not None for x in (clock, ids, limiter, metrics))
+
+
+async def test_memory_geo_index_filters_and_sorts() -> None:
+    from spm.adapters.memory import MemoryCatalogReader, MemoryShopGeoIndex
+    from spm.core.models import GeoPoint
+    from spm.ports import ShopGeoIndex
+
+    index: ShopGeoIndex = MemoryShopGeoIndex()
+    await index.load_shop_geo(list(MemoryCatalogReader.from_seeds().catalog.shops))
+    hits = await index.shops_within(GeoPoint(23.7808, 90.4073), 700)
+    assert [shop_id for shop_id, _ in hits] == ["shop-a", "shop-b"]

@@ -39,7 +39,7 @@
 | M01 | Backend skeleton (config, logging, app factory, errors) | Foundation | M00 | ✅ Done 2026-10-22 |
 | M02 | Domain model & ports | Foundation | M01 | ✅ Done 2026-10-22 |
 | M03 | Database schema & migrations | Data | M02 | ✅ Done 2026-10-22 |
-| M04 | Catalog seeds, repositories & catalog API | Data | M03 | ⬜ |
+| M04 | Catalog seeds, repositories & catalog API | Data | M03 | ✅ Done 2026-10-22 |
 | M05 | Normalizer **(B)** | Write path | M04 | ⬜ |
 | M06 | Guardrails **(C)** | Write path | M05 | ⬜ |
 | M07 | Event backbone (envelope, outbox, bus adapters, consumer runtime) | Write path | M03 | ⬜ |
@@ -2052,6 +2052,13 @@ Every deviation from this document is recorded here: date, module, decision and 
 | 2026-10-22 | M03 | `tables.py` is checked against the migrated DB by an Alembic autogenerate diff (integration test) | the migration is the source of truth; the diff stops the metadata drifting |
 | 2026-10-22 | M03 | The container builds the engine and session factory when `SPM_DATABASE_URL` is set; `/readyz` uses the pooled engine for `db` | replaces the M01 one-shot DB probe, as planned in M01 |
 | 2026-10-22 | M03 | Test databases are cloned from `template_postgis` when it exists | `CREATE EXTENSION postgis` in an empty DB takes about 4 s; cloning takes about 1 s |
+| 2026-10-22 | M04 | `normalize_text` implemented now in `core/normalizer.py` (M05 adds the rest); it keeps Unicode combining marks | seeding stores normalized aliases; Bangla/Devanagari vowel signs are marks, and dropping them mangles words |
+| 2026-10-22 | M04 | New port `ShopGeoIndex` (`load_shop_geo`, `shops_within`); `HotCache` extends it | M04 builds only the geo half of the hot cache; the API and seeder depend on the narrower port |
+| 2026-10-22 | M04 | `CatalogCache.ensure_fresh()` is async, getters are sync; on a failed refresh the previous snapshot keeps being served | sync getters can't await I/O; a short DB blip shouldn't take the catalog down |
+| 2026-10-22 | M04 | `spm:geo:shops` is rebuilt at API startup (best effort) as well as by `spm seed` | §3.2 says "rebuilt by seed and on startup" |
+| 2026-10-22 | M04 | Seeding upserts and never deletes rows that were removed from the YAML | rows may be referenced by reports and subscriptions; set `active: false` to retire one |
+| 2026-10-22 | M04 | `GET /v1/shops`: `radius_m` defaults to `NEARBY_RADIUS_M` (2000) and must be in (0, 50 000]; `lat`/`lng` must be given together; an unknown `area` is a 404; only active shops are returned; `/v1/products` lists active products only | the plan doesn't specify these cases |
+| 2026-10-22 | M04 | `create_app(container=…)` accepts a pre-built container | API unit tests run on memory adapters without Docker |
 
 ---
 

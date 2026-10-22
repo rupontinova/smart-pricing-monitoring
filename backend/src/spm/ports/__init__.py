@@ -1,6 +1,6 @@
 """Port interfaces (``typing.Protocol``). Services depend on these only; adapters implement them."""
 
-from spm.ports.cache import HotCache, RateLimiter
+from spm.ports.cache import HotCache, RateLimiter, ShopGeoIndex
 from spm.ports.catalog import CatalogReader
 from spm.ports.clock import Clock, IdGenerator
 from spm.ports.events import EventPublisher, OutboxRepo
@@ -36,6 +36,7 @@ __all__ = [
     "RateLimiter",
     "ReportRepo",
     "ReporterRepo",
+    "ShopGeoIndex",
     "StatsRepo",
     "SubscriptionRepo",
     "UnitOfWork",

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -13,7 +14,7 @@ runner = CliRunner()
 
 @pytest.mark.parametrize(
     ("command", "module"),
-    [("worker", "M13"), ("scheduler", "M17"), ("seed", "M04")],
+    [("worker", "M13"), ("scheduler", "M17")],
 )
 def test_cli_placeholder_commands_say_not_implemented(command: str, module: str) -> None:
     result = runner.invoke(cli.app, [command])
@@ -42,6 +43,12 @@ def test_cli_migrate_upgrades_to_head(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(cli.app, ["migrate"])
     assert result.exit_code == 0, result.output
     assert calls == [("head", get_settings().database_url)]
+
+
+def test_cli_seed_rejects_invalid_seed_dir(tmp_path: Path) -> None:
+    result = runner.invoke(cli.app, ["seed", "--dir", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "Invalid seed files" in result.output
 
 
 def test_lambda_handler_is_mangum() -> None:

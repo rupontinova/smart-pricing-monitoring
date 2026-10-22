@@ -1,0 +1,9 @@
+# PLACEHOLDER DATA — replace with your real area before production use.
+# center: area centre point (WGS84). quiet_start/quiet_end: no push alerts in this local-time window.
+areas:
+  - id: demo-central
+    name: Demo Central
+    timezone: Asia/Dhaka
+    center: {lat: 23.7808, lng: 90.4073}
+    quiet_start: "22:00"
+    quiet_end: "07:00"

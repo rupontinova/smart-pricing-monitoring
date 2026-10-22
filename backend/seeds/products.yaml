@@ -1,0 +1,15 @@
+# PLACEHOLDER DATA — example catalog; replace with your real products and price bounds.
+# Prices (abs_min / abs_max) are per base unit, in SPM_CURRENCY units.
+# half_life_h is the *default* half-life; the nightly job (M17) tunes the live value and re-seeding
+# never overwrites a tuned value. List order = display order (sort_order).
+products:
+  - {id: onion,   name: Onion,         base_unit: kg,    category: vegetable, half_life_h: 48,  abs_min: 10, abs_max: 500, aliases: [piyaj, peyaj, piyaz, pyaz]}
+  - {id: potato,  name: Potato,        base_unit: kg,    category: vegetable, half_life_h: 96,  abs_min: 5,  abs_max: 300, aliases: [alu, aloo]}
+  - {id: tomato,  name: Tomato,        base_unit: kg,    category: vegetable, half_life_h: 48,  abs_min: 10, abs_max: 600, aliases: [tometo]}
+  - {id: rice,    name: Rice (coarse), base_unit: kg,    category: staple,    half_life_h: 336, abs_min: 20, abs_max: 400, aliases: [chal, chawal]}
+  - {id: lentils, name: Red lentils,   base_unit: kg,    category: staple,    half_life_h: 240, abs_min: 50, abs_max: 500, aliases: [dal, masoor, mosur dal]}
+  - {id: sugar,   name: Sugar,         base_unit: kg,    category: staple,    half_life_h: 336, abs_min: 50, abs_max: 400, aliases: [chini]}
+  - {id: flour,   name: Wheat flour,   base_unit: kg,    category: staple,    half_life_h: 336, abs_min: 20, abs_max: 300, aliases: [atta, ata]}
+  - {id: oil,     name: Soybean oil,   base_unit: l,     category: staple,    half_life_h: 240, abs_min: 80, abs_max: 600, aliases: [tel, soybean oil]}
+  - {id: eggs,    name: Eggs,          base_unit: dozen, category: protein,   half_life_h: 120, abs_min: 60, abs_max: 400, aliases: [dim, anda, egg]}
+  - {id: milk,    name: Milk,          base_unit: l,     category: dairy,     half_life_h: 168, abs_min: 40, abs_max: 300, aliases: [dudh, doodh]}
