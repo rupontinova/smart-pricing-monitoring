@@ -1,0 +1,109 @@
+[project]
+name = "spm"
+dynamic = ["version"]
+description = "Smart Pricing Monitor — crowdsourced fair-price checker for groceries"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "asyncpg>=0.32.0",
+    "fastapi>=0.146.0",
+    "geoalchemy2>=0.20.0",
+    "mangum>=0.22.0",
+    "pydantic>=2.14.1",
+    "pydantic-settings>=2.16.0",
+    "redis>=8.1.0",
+    "sqlalchemy[asyncio]>=2.1.5",
+    "structlog>=26.1.0",
+    "typer>=0.27.3",
+    "uuid-utils>=1.0.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/spm/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spm"]
+
+[dependency-groups]
+dev = [
+    "coverage>=7.16.2",
+    "httpx>=0.28.1",
+    "hypothesis>=6.170.2",
+    "import-linter>=2.15",
+    "mypy>=2.4.0",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["spm"]
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["spm"]
+check_untyped_defs = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["spm.core.*", "spm.constants"]
+strict = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: needs the docker-compose Postgres and Redis",
+    "e2e: API + worker end-to-end",
+]
+
+[tool.coverage.run]
+source = ["spm"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+# ---------------------------------------------------------------- import-linter
+[tool.importlinter]
+root_packages = ["spm"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "spm.core is pure (no frameworks, no I/O, no outer layers)"
+type = "forbidden"
+source_modules = ["spm.core"]
+forbidden_modules = [
+    "sqlalchemy",
+    "redis",
+    "fastapi",
+    "boto3",
+    "httpx",
+    "spm.adapters",
+    "spm.api",
+    "spm.services",
+    "spm.workers",
+]

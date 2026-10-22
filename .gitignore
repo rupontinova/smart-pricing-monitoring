@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.import_linter_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+.pnpm-store/
+frontend/dist/
+*.tsbuildinfo
+
+# CDK
+cdk.out/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
