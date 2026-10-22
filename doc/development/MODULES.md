@@ -40,7 +40,7 @@
 | M02 | Domain model & ports | Foundation | M01 | ✅ Done 2026-10-22 |
 | M03 | Database schema & migrations | Data | M02 | ✅ Done 2026-10-22 |
 | M04 | Catalog seeds, repositories & catalog API | Data | M03 | ✅ Done 2026-10-22 |
-| M05 | Normalizer **(B)** | Write path | M04 | ⬜ |
+| M05 | Normalizer **(B)** | Write path | M04 | ✅ Done 2026-10-22 |
 | M06 | Guardrails **(C)** | Write path | M05 | ⬜ |
 | M07 | Event backbone (envelope, outbox, bus adapters, consumer runtime) | Write path | M03 | ⬜ |
 | M08 | Device auth & `POST /v1/reports` | Write path | M06, M07 | ⬜ |
@@ -2059,6 +2059,11 @@ Every deviation from this document is recorded here: date, module, decision and 
 | 2026-10-22 | M04 | Seeding upserts and never deletes rows that were removed from the YAML | rows may be referenced by reports and subscriptions; set `active: false` to retire one |
 | 2026-10-22 | M04 | `GET /v1/shops`: `radius_m` defaults to `NEARBY_RADIUS_M` (2000) and must be in (0, 50 000]; `lat`/`lng` must be given together; an unknown `area` is a 404; only active shops are returned; `/v1/products` lists active products only | the plan doesn't specify these cases |
 | 2026-10-22 | M04 | `create_app(container=…)` accepts a pre-built container | API unit tests run on memory adapters without Docker |
+| 2026-10-22 | M05 | Fuzzy score = `100 × (1 − d / (len(a) + len(b)))`, with `d` the unit-cost Levenshtein distance | the plan's required case "oniun" → onion (1 typo) scores 80 with the max-length ratio and with python-Levenshtein's `ratio`, below `FUZZY_MATCH_MIN_SCORE` = 85; this variant gives 90 |
+| 2026-10-22 | M05 | New `FUZZY_MIN_LENGTH` = 5: shorter text never auto-resolves by fuzzy match (it still gets suggestions) | with the chosen ratio, one typo in a 4-letter word scores 87.5, so "chai" (tea) resolved to rice via "chal"; a wrong silent match is worse than a "did you mean" |
+| 2026-10-22 | M05 | New `FUZZY_SUGGEST_MIN_SCORE` = 60 and `FUZZY_MAX_SUGGESTIONS` = 3 constants | the plan's literal values, moved into `constants.py` per §2.7 |
+| 2026-10-22 | M05 | Non-positive or non-finite price/quantity and > 2 decimal places → `VALIDATION_ERROR` (with `fields`); missing product id and text → `VALIDATION_ERROR` | the plan says "validate" without naming a code; `QUANTITY_OUT_OF_RANGE` stays for the base-quantity bounds |
+| 2026-10-22 | M05 | `NormalizedPrice.base_quantity` is unrounded (e.g. 0.08333333333 dozen); only `norm_price` is quantized | rounding to the column's 4 dp happens at storage (M08), so no precision is lost before the price division |
 
 ---
 
