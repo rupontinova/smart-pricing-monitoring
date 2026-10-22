@@ -12,17 +12,6 @@ from spm.entrypoints import cli
 runner = CliRunner()
 
 
-@pytest.mark.parametrize(
-    ("command", "module"),
-    [("worker", "M13"), ("scheduler", "M17")],
-)
-def test_cli_placeholder_commands_say_not_implemented(command: str, module: str) -> None:
-    result = runner.invoke(cli.app, [command])
-    assert result.exit_code == 0
-    assert "not implemented yet" in result.output
-    assert module in result.output
-
-
 def test_cli_api_runs_uvicorn_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
     monkeypatch.setattr("uvicorn.run", lambda *a, **kw: calls.append((a, kw)))
@@ -49,6 +38,12 @@ def test_cli_seed_rejects_invalid_seed_dir(tmp_path: Path) -> None:
     result = runner.invoke(cli.app, ["seed", "--dir", str(tmp_path)])
     assert result.exit_code == 1
     assert "Invalid seed files" in result.output
+
+
+def test_cli_worker_without_consumers_exits() -> None:
+    result = runner.invoke(cli.app, ["worker", "--no-debug-log-events"])
+    assert result.exit_code == 0
+    assert "No consumers registered" in result.output
 
 
 def test_lambda_handler_is_mangum() -> None:

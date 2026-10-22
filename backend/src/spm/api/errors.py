@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from spm.core.errors import ERROR_TYPES, Internal, RateLimited, SpmError
+from spm.core.errors import ERROR_TYPES, Internal, RateLimited, SpmError, Unauthorized
 
 PROBLEM_JSON = "application/problem+json"
 ERROR_TYPE_BASE = "https://spm.dev/errors/"
@@ -64,7 +64,11 @@ def code_for_status(status: int) -> str:
 
 async def _spm_error(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, SpmError)
-    headers = {"Retry-After": str(exc.retry_after_s)} if isinstance(exc, RateLimited) else None
+    headers: dict[str, str] | None = None
+    if isinstance(exc, RateLimited):
+        headers = {"Retry-After": str(exc.retry_after_s)}
+    elif isinstance(exc, Unauthorized):
+        headers = {"WWW-Authenticate": "Bearer"}
     return problem(
         exc.status, exc.code, exc.title, exc.detail or None, headers=headers, extra=exc.extra
     )

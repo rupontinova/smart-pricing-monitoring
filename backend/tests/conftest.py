@@ -9,7 +9,12 @@ from spm.config import Settings
 
 def make_settings(**overrides: object) -> Settings:
     """Settings isolated from the developer's environment and `.env` file."""
-    values: dict[str, object] = {"env": "test", "database_url": "", "redis_url": ""}
+    values: dict[str, object] = {
+        "env": "test",
+        "database_url": "",
+        "redis_url": "",
+        "jwt_secret": "test-jwt-secret-of-at-least-32-bytes",
+    }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[arg-type]
 

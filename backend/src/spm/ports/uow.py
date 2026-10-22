@@ -1,7 +1,7 @@
 from types import TracebackType
 from typing import Protocol, Self
 
-from spm.ports.events import OutboxRepo
+from spm.ports.events import OutboxRepo, ProcessedEventRepo
 from spm.ports.repos import (
     AlertRepo,
     AnomalyRepo,
@@ -25,6 +25,7 @@ class UnitOfWork(Protocol):
     bands: BandRepo
     stats: StatsRepo
     outbox: OutboxRepo
+    processed: ProcessedEventRepo
     subscriptions: SubscriptionRepo
     alerts: AlertRepo
     checks: PriceCheckRepo

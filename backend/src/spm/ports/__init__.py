@@ -3,7 +3,13 @@
 from spm.ports.cache import HotCache, RateLimiter, ShopGeoIndex
 from spm.ports.catalog import CatalogReader
 from spm.ports.clock import Clock, IdGenerator
-from spm.ports.events import EventPublisher, OutboxRepo
+from spm.ports.events import (
+    EventConsumer,
+    EventPublisher,
+    Handler,
+    OutboxRepo,
+    ProcessedEventRepo,
+)
 from spm.ports.metrics import Metrics
 from spm.ports.notify import Notifier
 from spm.ports.repos import (
@@ -11,6 +17,7 @@ from spm.ports.repos import (
     AnomalyRepo,
     AssessmentRepo,
     BandRepo,
+    DuplicateClientReport,
     PriceCheckRepo,
     ReporterRepo,
     ReportRepo,
@@ -26,13 +33,17 @@ __all__ = [
     "BandRepo",
     "CatalogReader",
     "Clock",
+    "DuplicateClientReport",
+    "EventConsumer",
     "EventPublisher",
+    "Handler",
     "HotCache",
     "IdGenerator",
     "Metrics",
     "Notifier",
     "OutboxRepo",
     "PriceCheckRepo",
+    "ProcessedEventRepo",
     "RateLimiter",
     "ReportRepo",
     "ReporterRepo",

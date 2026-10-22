@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Placeholder secret value shipped in `.env.example`; refused outside local/test.
 INSECURE_DEFAULT_SECRET = "change-me"
+MIN_JWT_SECRET_BYTES = 32  # HS256 key length (RFC 7518 §3.2)
 
 
 class Settings(BaseSettings):
@@ -41,6 +42,8 @@ class Settings(BaseSettings):
     vapid_private_key: SecretStr = SecretStr("")
     vapid_subject: str = ""
 
+    allow_backfill: bool = False  # admin backfill on AWS (always allowed locally)
+
     aws_event_bus_name: str = "spm-bus"
     sns_topic_arn: str = ""
 
@@ -62,6 +65,10 @@ class Settings(BaseSettings):
         ]
         if weak:
             raise ValueError(f"SPM_ENV=aws requires non-default secrets: {', '.join(weak)}")
+        if len(self.jwt_secret.get_secret_value().encode()) < MIN_JWT_SECRET_BYTES:
+            raise ValueError(
+                f"SPM_ENV=aws requires SPM_JWT_SECRET of at least {MIN_JWT_SECRET_BYTES} bytes"
+            )
         return self
 
 

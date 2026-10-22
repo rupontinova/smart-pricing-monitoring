@@ -25,12 +25,17 @@ def test_settings_read_from_env_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_settings_refuse_default_secrets_when_aws() -> None:
     with pytest.raises(ValidationError, match="jwt_secret, admin_api_key, ip_hash_salt"):
-        make_settings(env="aws")
+        Settings(_env_file=None, env="aws")
 
 
 def test_settings_refuse_empty_secret_when_aws() -> None:
     with pytest.raises(ValidationError, match="ip_hash_salt"):
         make_settings(env="aws", jwt_secret="a" * 32, admin_api_key="b" * 32, ip_hash_salt="")
+
+
+def test_settings_refuse_short_jwt_secret_when_aws() -> None:
+    with pytest.raises(ValidationError, match="at least 32 bytes"):
+        make_settings(env="aws", jwt_secret="a" * 31, admin_api_key="b" * 32, ip_hash_salt="c" * 32)
 
 
 def test_settings_accept_real_secrets_when_aws() -> None:

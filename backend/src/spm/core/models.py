@@ -69,6 +69,7 @@ class Reporter:
     reports_total: int
     banned: bool
     created_at: datetime
+    last_seen_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if self.alpha <= 0 or self.beta <= 0:

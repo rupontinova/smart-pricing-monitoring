@@ -46,9 +46,38 @@ def _not_implemented(command: str, module: str) -> None:
 
 
 @app.command()
-def worker() -> None:
-    """Run the event consumers."""
-    _not_implemented("worker", "M13")
+def worker(
+    debug_log_events: Annotated[
+        bool | None,
+        typer.Option(
+            "--debug-log-events/--no-debug-log-events",
+            help="Log every event (default: on when SPM_ENV=local).",
+        ),
+    ] = None,
+) -> None:
+    """Run the event consumers until SIGINT/SIGTERM."""
+    import asyncio
+
+    from spm.container import build_container
+    from spm.workers.runtime import ConsumerSpec, log_event, run_consumers
+
+    settings = get_settings()
+    configure_logging(settings)
+    specs: list[ConsumerSpec] = []  # business consumers register here from M13 on
+    if debug_log_events if debug_log_events is not None else settings.env == "local":
+        specs.append(ConsumerSpec("debug-log", log_event))
+    if not specs:
+        typer.echo("No consumers registered (use --debug-log-events to log events).")
+        return
+
+    async def main() -> None:
+        container = await build_container(settings)
+        try:
+            await run_consumers(container, specs)
+        finally:
+            await container.close()
+
+    asyncio.run(main())
 
 
 @app.command()

@@ -90,11 +90,13 @@ class GuardrailService:
         fix: LocationFix | None,
         *,
         allow_backfill: bool = False,
+        enforce_rate_limits: bool = True,
     ) -> Admission:
         now = self._clock.now()
 
         # 1. Rate limits: one counter per window; a request denied hourly doesn't count daily.
-        for limit, window_s, label in RATE_LIMITS:
+        #    The trusted admin backfill (simulator) skips them.
+        for limit, window_s, label in RATE_LIMITS if enforce_rate_limits else ():
             allowed, retry_after = await self._rate_limiter.hit(
                 "report", str(reporter_id), limit, window_s
             )

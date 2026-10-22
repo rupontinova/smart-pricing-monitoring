@@ -16,7 +16,7 @@ from spm.api.middleware import (
     ServerTimingMiddleware,
     UnhandledErrorMiddleware,
 )
-from spm.api.routers import catalog, health
+from spm.api.routers import catalog, health, reports
 from spm.config import Settings, get_settings
 from spm.container import Container, build_container
 from spm.logging import configure_logging
@@ -74,4 +74,5 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
 
     app.include_router(health.router)
     app.include_router(catalog.router)
+    app.include_router(reports.router)
     return app

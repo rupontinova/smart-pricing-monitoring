@@ -19,17 +19,29 @@ from spm.core.models import (
 )
 
 
+class DuplicateClientReport(Exception):
+    """``ReportRepo.add``: this reporter already stored a report with this ``client_report_id``."""
+
+
 class ReporterRepo(Protocol):
     async def get(self, reporter_id: UUID) -> Reporter | None: ...
     async def get_by_device(self, device_id: str) -> Reporter | None: ...
-    async def create(self, reporter: Reporter) -> None: ...
+    async def create(self, reporter: Reporter) -> None:
+        """Insert; a no-op if the device already has a reporter (concurrent first logins)."""
+        ...
+
+    async def touch(self, reporter_id: UUID, at: datetime) -> None:
+        """Set ``last_seen_at`` unless it was set within the last hour."""
+        ...
+
     async def add_evidence(self, reporter_id: UUID, d_alpha: float, d_beta: float) -> None: ...
     async def trust_many(self, ids: Iterable[UUID]) -> dict[UUID, float]: ...
 
 
 class ReportRepo(Protocol):
     async def add(self, report: Report) -> None:
-        """Also inserts the idempotency row and a ``queued`` assessment."""
+        """Also inserts the idempotency row and a ``queued`` assessment, and counts the report on
+        the reporter. Raises ``DuplicateClientReport`` if the idempotency row already exists."""
         ...
 
     async def by_client_id(self, reporter_id: UUID, client_report_id: UUID) -> UUID | None: ...

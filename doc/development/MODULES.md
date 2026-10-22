@@ -42,10 +42,10 @@
 | M04 | Catalog seeds, repositories & catalog API | Data | M03 | ✅ Done 2026-10-22 |
 | M05 | Normalizer **(B)** | Write path | M04 | ✅ Done 2026-10-22 |
 | M06 | Guardrails **(C)** | Write path | M05 | ✅ Done 2026-10-22 |
-| M07 | Event backbone (envelope, outbox, bus adapters, consumer runtime) | Write path | M03 | ⬜ |
-| M08 | Device auth & `POST /v1/reports` | Write path | M06, M07 | ⬜ |
-| M09 | Robust statistics library | Intelligence | M02 | ⬜ |
-| M10 | Trust engine **(D)** | Intelligence | M09 | ⬜ |
+| M07 | Event backbone (envelope, outbox, bus adapters, consumer runtime) | Write path | M03 | ✅ Done 2026-10-22 |
+| M08 | Device auth & `POST /v1/reports` | Write path | M06, M07 | ✅ Done 2026-10-22 |
+| M09 | Robust statistics library | Intelligence | M02 | ✅ Done 2026-10-22 |
+| M10 | Trust engine **(D)** | Intelligence | M09 | ✅ Done 2026-10-22 |
 | M11 | Anomaly classifier **(E)** | Intelligence | M10 | ⬜ |
 | M12 | Fair-price band & hot cache **(F, G)** | Intelligence | M11 | ⬜ |
 | M13 | Scoring worker (orchestration) | Intelligence | M08, M12 | ⬜ |
@@ -216,6 +216,7 @@ smart-pricing-monitoring/
 | `SPM_CORS_ORIGINS` | `http://localhost:5173` | comma-separated |
 | `SPM_SMTP_HOST` / `_PORT` / `_FROM` | `localhost` / `1025` / `alerts@spm.local` | Mailpit |
 | `SPM_VAPID_PUBLIC_KEY` / `_PRIVATE_KEY` / `_SUBJECT` | empty | web push (M21) |
+| `SPM_ALLOW_BACKFILL` | `false` | admin backfill on AWS (always allowed in local/test) — M08 |
 | `SPM_AWS_EVENT_BUS_NAME` | `spm-bus` | |
 | `SPM_SNS_TOPIC_ARN` | empty | |
 
@@ -2071,6 +2072,29 @@ Every deviation from this document is recorded here: date, module, decision and 
 | 2026-10-22 | M06 | A duplicate is reported in `Admission.duplicate_of`, not raised; M08 decides the response | the plan's `Admission` has `duplicate_of`; dedupe is a policy decision for the endpoint |
 | 2026-10-22 | M06 | The guardrail service depends on narrow protocols (`ReportsUnitOfWork`, `BandLookup`); `hot_cache` is optional until M12, so hints use `sqrt(abs_min × abs_max)` as the reference | the full `UnitOfWork`/`HotCache` don't exist yet |
 | 2026-10-22 | M06 | `find_recent_duplicate` also filters `received_at >= since − 5 min` | redundant for correctness (received ≥ observed − skew) but lets Postgres prune monthly partitions |
+| 2026-10-22 | M07 | `core/events.py` uses pydantic and orjson, an exception to §2.3's "stdlib only" for `spm.core` | M07 specifies pydantic payload models and orjson; both are pure (no I/O) and import-linter still forbids I/O frameworks |
+| 2026-10-22 | M07 | `Event.data` holds the JSON-mode payload (Decimals as exact strings, e.g. `"80.0000"`); `occurred_at` is serialized with a `Z` suffix | the envelope must cross JSON boundaries unchanged; `event.payload()` gives the typed model back |
+| 2026-10-22 | M07 | `OutboxPublisher.flush(events)` takes the events, not their ids, and returns whether it succeeded | the caller has just written them, so re-reading them from the DB would be pointless |
+| 2026-10-22 | M07 | Dead-lettering happens after the 5th failed **handler run** (memory and Redis alike); a reclaimed entry already delivered more than 5 times (crash loop) is dead-lettered without running | "≥ 5 deliveries → DLQ" checked before running would leave only 4 attempts; the tests expect 5 |
+| 2026-10-22 | M07 | `idempotent` marks the event first (`INSERT … ON CONFLICT DO NOTHING RETURNING`) inside the handler's transaction, then runs the handler | race-free: a concurrent duplicate blocks on the row and then skips; side effects and the mark commit or roll back together |
+| 2026-10-22 | M07 | New port `ProcessedEventRepo` (`UnitOfWork.processed`); the container has `bus` (publisher) and `consumer` (None for EventBridge) | the plan lists the processed repo but no port; EventBridge can't be consumed in-process |
+| 2026-10-22 | M07 | `spm worker` enables the debug log consumer by default when `SPM_ENV=local` (`--debug-log-events/--no-debug-log-events`) | the DoD expects `make worker` to log events |
+| 2026-10-22 | M08 | Admin backfill also skips the report rate limits (`GuardrailService.admit(enforce_rate_limits=False)`) | the simulator posts many reports per synthetic reporter through this trusted path; 30/hour would block it |
+| 2026-10-22 | M08 | `ReportRepo.add` inserts the idempotency row first (`ON CONFLICT DO NOTHING RETURNING`) and raises `DuplicateClientReport`; the service then returns the winner's report | two concurrent retries of the same `client_report_id` must yield one report and a 200, not a 500 |
+| 2026-10-22 | M08 | New `ReporterRepo.touch(id, at)` (one conditional UPDATE) and `Reporter.last_seen_at` | "update last_seen_at at most once per hour" without reading first |
+| 2026-10-22 | M08 | JWT expiry is checked against the injected clock (PyJWT's own `exp` check is disabled); a token must also match the reporter's device id | testable expiry; a token for a re-created reporter can't be replayed |
+| 2026-10-22 | M08 | With `SPM_ENV=aws`, `SPM_JWT_SECRET` must be at least 32 bytes | HS256 key length (RFC 7518 §3.2); PyJWT warns below that |
+| 2026-10-22 | M08 | 401 responses carry `WWW-Authenticate: Bearer`; another reporter's report is a 404, not a 403 | RFC 9110; don't reveal that a report id exists |
+| 2026-10-22 | M08 | `POST /v1/reports` request schema: `price` ≤ 2 dp, `quantity` ≤ 3 dp (the `raw_quantity` column), aware `observed_at`, no unknown fields; `ReportOut.status` is the real scoring state (replays may already be scored) | matches the columns and avoids silent rounding |
+| 2026-10-22 | M08 | `LogMetrics` (one debug log line per metric) is the `SPM_METRICS=log` adapter until M18 | the service counts `reports_received`, `reports_duplicate` and `reports_rejected{code}` now |
+| 2026-10-22 | M08 | Partial `PgAssessmentRepo` (`get_state`) and `PgBandRepo` (`shop_prices`) for `GET /v1/reports/{id}` | the status endpoint needs them; scoring (M10 to M13) completes both |
+| 2026-10-22 | M09 | `cap_group_share` uses water-filling: every over-share group ends at exactly `max_share` of the new total; groups pushed over by others' capping are capped too; if capping is infeasible (fewer than 1/`max_share` groups) the capped groups are equalized; a single group is left alone | the plan's "one pass" leaves groups above the cap when several exceed it (45/45/10 at 40% → ~44% each), and with one group it would zero all weight; identical to the plan for one dominant shop |
+| 2026-10-22 | M09 | New constant `HALF_LIFE_MIN_RETURNS` = 10 | the plan's literal "fewer than 10 returns", moved into `constants.py` per §2.7 |
+| 2026-10-22 | M09 | `weighted_quantile` validates its input (lengths, q ∈ [0, 1], finite non-negative weights); `freshness_weight` needs `half_life_h > 0`; `log_ratio` needs positive values; `daily_log_returns` also skips non-finite values | fail loudly on bad statistics input |
+| 2026-10-22 | M10 | `settle_normal`: if any independent peer agrees, only the +α rewards are returned (no β penalty even if two other peers contradict); a contradicting pair must also be independent of each other | the plan lists both rules without precedence; a corroborated report shouldn't be penalized |
+| 2026-10-22 | M10 | `verified_shop_price` counts unscored observations (classification `None`, e.g. the report being scored); the cluster's latest observation is chosen by `(observed_at, report_id)`; with all-zero weights the plain median is used; the price is returned even when not verified | the plan excludes only PENDING / BAD_REPORT / EXPIRED; deterministic tie-break; `weighted_median` raises on zero weight |
+| 2026-10-22 | M10 | `is_corroborated` returns `(True, supporting_ids)` with high trust too (the ids may be empty); `report_weight` treats negative trust as 0 | callers still get any agreeing ids; weights can't go negative |
+| 2026-10-22 | M10 | The auth service creates reporters with `TRUST_PRIOR_ALPHA/_BETA` | replaces M08's local placeholder |
 
 ---
 
