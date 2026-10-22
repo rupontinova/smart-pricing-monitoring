@@ -19,3 +19,14 @@ FUZZY_MATCH_MIN_SCORE: Final = 85  # a single best fuzzy candidate at or above t
 FUZZY_MIN_LENGTH: Final = 5  # shorter text never auto-resolves by fuzzy match (only suggests)
 FUZZY_SUGGEST_MIN_SCORE: Final = 60  # UnknownProduct suggests products scoring at least this
 FUZZY_MAX_SUGGESTIONS: Final = 3
+
+# M06 — guardrails
+OBSERVED_AT_MAX_AGE_H: Final = 168  # 7 days
+OBSERVED_AT_FUTURE_SKEW_MIN: Final = 5
+GEOFENCE_BASE_M: Final = 300
+GEOFENCE_ACCURACY_ALLOWANCE_MAX_M: Final = 200  # allowed = base + min(accuracy, this)
+DEDUPE_WINDOW_H: Final = 6
+DEDUPE_PRICE_TOL: Final = Decimal("0.01")  # relative difference
+RATE_LIMIT_PER_HOUR: Final = 30  # reports per reporter
+RATE_LIMIT_PER_DAY: Final = 100
+UNIT_HINT_MAX: Final = 2  # "did you mean" hints returned

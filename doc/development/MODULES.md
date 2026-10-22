@@ -41,7 +41,7 @@
 | M03 | Database schema & migrations | Data | M02 | ✅ Done 2026-10-22 |
 | M04 | Catalog seeds, repositories & catalog API | Data | M03 | ✅ Done 2026-10-22 |
 | M05 | Normalizer **(B)** | Write path | M04 | ✅ Done 2026-10-22 |
-| M06 | Guardrails **(C)** | Write path | M05 | ⬜ |
+| M06 | Guardrails **(C)** | Write path | M05 | ✅ Done 2026-10-22 |
 | M07 | Event backbone (envelope, outbox, bus adapters, consumer runtime) | Write path | M03 | ⬜ |
 | M08 | Device auth & `POST /v1/reports` | Write path | M06, M07 | ⬜ |
 | M09 | Robust statistics library | Intelligence | M02 | ⬜ |
@@ -2064,6 +2064,13 @@ Every deviation from this document is recorded here: date, module, decision and 
 | 2026-10-22 | M05 | New `FUZZY_SUGGEST_MIN_SCORE` = 60 and `FUZZY_MAX_SUGGESTIONS` = 3 constants | the plan's literal values, moved into `constants.py` per §2.7 |
 | 2026-10-22 | M05 | Non-positive or non-finite price/quantity and > 2 decimal places → `VALIDATION_ERROR` (with `fields`); missing product id and text → `VALIDATION_ERROR` | the plan says "validate" without naming a code; `QUANTITY_OUT_OF_RANGE` stays for the base-quantity bounds |
 | 2026-10-22 | M05 | `NormalizedPrice.base_quantity` is unrounded (e.g. 0.08333333333 dozen); only `norm_price` is quantized | rounding to the column's 4 dp happens at storage (M08), so no precision is lost before the price division |
+| 2026-10-22 | M06 | `QUANTITY_OUT_OF_RANGE` from step 2 also carries `hints` | the plan's own example (onion 40 for "500 kg") fails `normalize` on the 50 kg limit before the bounds step, so its "500 g" hint would never reach the user |
+| 2026-10-22 | M06 | A hint must also normalize cleanly (base quantity in range); near-identical hints (prices within 1%) are merged, keeping the first; scaled quantities are rounded to 3 dp | a suggestion the user can't submit is useless, and "1 piece" and "0.083 dozen" are one suggestion |
+| 2026-10-22 | M06 | `hints` in error extras are `{message, quantity, unit, norm_price}` with numbers; `problem()` runs extras through `jsonable_encoder` | the problem body is JSON; Decimals, datetimes and UUIDs in extras must serialize |
+| 2026-10-22 | M06 | `RateLimiter.hit` returns `retry_after_s = 0` when allowed (both adapters); TTL via `EXPIRE … NX` in a `MULTI` | keeps the port contract from M02; NX sets the TTL on the first increment only |
+| 2026-10-22 | M06 | A duplicate is reported in `Admission.duplicate_of`, not raised; M08 decides the response | the plan's `Admission` has `duplicate_of`; dedupe is a policy decision for the endpoint |
+| 2026-10-22 | M06 | The guardrail service depends on narrow protocols (`ReportsUnitOfWork`, `BandLookup`); `hot_cache` is optional until M12, so hints use `sqrt(abs_min × abs_max)` as the reference | the full `UnitOfWork`/`HotCache` don't exist yet |
+| 2026-10-22 | M06 | `find_recent_duplicate` also filters `received_at >= since − 5 min` | redundant for correctness (received ≥ observed − skew) but lets Postgres prune monthly partitions |
 
 ---
 

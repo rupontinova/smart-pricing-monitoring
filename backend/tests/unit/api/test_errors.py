@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+from datetime import UTC, datetime
 
 import httpx
 import structlog
@@ -102,3 +103,16 @@ async def test_rate_limited_sets_retry_after(app: FastAPI) -> None:
     assert response.headers["retry-after"] == "42"
     assert response.json()["code"] == "RATE_LIMITED"
     assert response.json()["retry_after_s"] == 42
+
+
+async def test_problem_extras_are_json_encoded(app: FastAPI) -> None:
+    from decimal import Decimal
+
+    @app.get("/_test/decimal-extra")
+    async def decimal_extra() -> None:
+        raise RateLimited(retry_after_s=5, limit=Decimal("30"), at=datetime(2026, 1, 1, tzinfo=UTC))
+
+    async for c in client_for(app):
+        body = (await c.get("/_test/decimal-extra")).json()
+    assert body["limit"] == 30
+    assert body["at"] == "2026-01-01T00:00:00+00:00"

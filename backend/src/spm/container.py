@@ -1,7 +1,8 @@
 """Dependency wiring: builds adapters from ``Settings``.
 
 Real so far: ``settings``, ``clock``, ``ids``; with ``SPM_DATABASE_URL`` the engine, session factory
-and catalog cache (M03/M04); with ``SPM_REDIS_URL`` the Redis client and shop geo index (M04).
+and catalog cache (M03/M04); with ``SPM_REDIS_URL`` the Redis client, shop geo index (M04) and
+rate limiter (M06).
 The other slots are filled by the modules that introduce them (M07 bus, M16 notifier, M18 metrics).
 """
 
@@ -15,9 +16,10 @@ from spm.adapters.ids import UuidV7Generator
 from spm.adapters.postgres.catalog_repo import PgCatalogReader
 from spm.adapters.postgres.db import make_engine, make_session_factory
 from spm.adapters.redis.hot_cache import RedisHotCache
+from spm.adapters.redis.rate_limiter import RedisRateLimiter
 from spm.config import Settings
 from spm.core.clock import SystemClock
-from spm.ports import Clock, IdGenerator, ShopGeoIndex
+from spm.ports import Clock, IdGenerator, RateLimiter, ShopGeoIndex
 from spm.services.catalog_cache import CatalogCache
 
 REDIS_CONNECT_TIMEOUT_S = 2.0
@@ -34,6 +36,7 @@ class Container:
     redis: "Redis | None" = None
     catalog: CatalogCache | None = None
     shop_geo: ShopGeoIndex | None = None
+    rate_limiter: RateLimiter | None = None
     bus: Any = None
     notifier: Any = None
     metrics: Any = None
@@ -67,4 +70,5 @@ async def build_container(settings: Settings) -> Container:
     if settings.redis_url:
         container.redis = make_redis(settings.redis_url)
         container.shop_geo = RedisHotCache(container.redis)
+        container.rate_limiter = RedisRateLimiter(container.redis, container.clock)
     return container

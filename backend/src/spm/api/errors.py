@@ -6,6 +6,7 @@ from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -45,7 +46,7 @@ def problem(
     if detail:
         body["detail"] = detail
     if extra:
-        body.update(extra)
+        body.update(jsonable_encoder(extra))  # Decimals, datetimes, UUIDs in error extras
     body["request_id"] = current_request_id()
     return JSONResponse(body, status_code=status, headers=headers, media_type=PROBLEM_JSON)
 

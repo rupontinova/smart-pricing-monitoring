@@ -1,7 +1,7 @@
 """``PgUnitOfWork``: one ``AsyncSession`` (one transaction) shared by every repository.
 
-Repository attributes (``reporters``, ``reports``, …) are wired here as their repositories are
-built (M04 onward); until then this is the transaction shell only.
+Repository attributes are wired here as their repositories are built: ``reports`` (M06, partial);
+the others follow from M08.
 """
 
 from types import TracebackType
@@ -9,6 +9,8 @@ from typing import Self
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from spm.adapters.postgres.report_repo import PgReportRepo
 
 
 class PgUnitOfWork:
@@ -24,6 +26,7 @@ class PgUnitOfWork:
 
     async def __aenter__(self) -> Self:
         self._session = self._session_factory()
+        self.reports = PgReportRepo(self._session)
         return self
 
     async def __aexit__(
