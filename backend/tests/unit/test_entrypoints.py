@@ -1,0 +1,57 @@
+from typing import Any
+
+import pytest
+from mangum import Mangum
+from typer.testing import CliRunner
+
+from spm.adapters.ids import UuidV7Generator
+from spm.config import get_settings
+from spm.entrypoints import cli
+
+runner = CliRunner()
+
+
+@pytest.mark.parametrize(
+    ("command", "module"),
+    [("worker", "M13"), ("scheduler", "M17"), ("seed", "M04")],
+)
+def test_cli_placeholder_commands_say_not_implemented(command: str, module: str) -> None:
+    result = runner.invoke(cli.app, [command])
+    assert result.exit_code == 0
+    assert "not implemented yet" in result.output
+    assert module in result.output
+
+
+def test_cli_api_runs_uvicorn_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    monkeypatch.setattr("uvicorn.run", lambda *a, **kw: calls.append((a, kw)))
+    result = runner.invoke(cli.app, ["api", "--port", "8123", "--no-reload"])
+    assert result.exit_code == 0, result.output
+    ((args, kwargs),) = calls
+    assert args == ("spm.api.app:create_app",)
+    assert kwargs["factory"] is True
+    assert kwargs["port"] == 8123
+    assert kwargs["reload"] is False
+
+
+def test_cli_migrate_upgrades_to_head(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(
+        "spm.adapters.postgres.migrate.upgrade", lambda rev, url=None: calls.append((rev, url))
+    )
+    result = runner.invoke(cli.app, ["migrate"])
+    assert result.exit_code == 0, result.output
+    assert calls == [("head", get_settings().database_url)]
+
+
+def test_lambda_handler_is_mangum() -> None:
+    from spm.entrypoints.lambda_api import handler
+
+    assert isinstance(handler, Mangum)
+
+
+def test_uuid7_generator_is_time_ordered() -> None:
+    ids = UuidV7Generator()
+    first, second = ids.new(), ids.new()
+    assert first.version == 7
+    assert second > first

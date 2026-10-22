@@ -1,0 +1,9 @@
+from typing import Protocol
+
+
+class Metrics(Protocol):
+    """Synchronous and non-blocking: implementations buffer and flush."""
+
+    def count(self, name: str, value: float = 1, **dims: str) -> None: ...
+    def gauge(self, name: str, value: float, **dims: str) -> None: ...
+    def timing(self, name: str, ms: float, **dims: str) -> None: ...

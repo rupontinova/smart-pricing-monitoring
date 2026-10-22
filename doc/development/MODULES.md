@@ -36,9 +36,9 @@
 | # | Module | Phase | Depends on | Status |
 |---|---|---|---|---|
 | M00 | Repository, tooling & local infrastructure | Foundation | — | ✅ Done 2026-10-22 |
-| M01 | Backend skeleton (config, logging, app factory, errors) | Foundation | M00 | ⬜ |
-| M02 | Domain model & ports | Foundation | M01 | ⬜ |
-| M03 | Database schema & migrations | Data | M02 | ⬜ |
+| M01 | Backend skeleton (config, logging, app factory, errors) | Foundation | M00 | ✅ Done 2026-10-22 |
+| M02 | Domain model & ports | Foundation | M01 | ✅ Done 2026-10-22 |
+| M03 | Database schema & migrations | Data | M02 | ✅ Done 2026-10-22 |
 | M04 | Catalog seeds, repositories & catalog API | Data | M03 | ⬜ |
 | M05 | Normalizer **(B)** | Write path | M04 | ⬜ |
 | M06 | Guardrails **(C)** | Write path | M05 | ⬜ |
@@ -191,6 +191,10 @@ smart-pricing-monitoring/
 | `FORBIDDEN` | 403 | auth (banned reporter, bad admin key) |
 | `NOT_FOUND` | 404 | any lookup |
 | `INTERNAL` | 500 | unhandled errors (no stack trace in the body) |
+| `BAD_REQUEST` | 400 | framework (unparseable body); fallback for other 4xx |
+| `METHOD_NOT_ALLOWED` | 405 | routing (sets `Allow`) |
+| `PAYLOAD_TOO_LARGE` | 413 | body size limit (16 KB) |
+| `SERVICE_UNAVAILABLE` | 503 | `/readyz` (includes `checks`) |
 
 ### 2.6 Configuration (`spm/config.py`, env prefix `SPM_`)
 
@@ -2033,6 +2037,21 @@ Every deviation from this document is recorded here: date, module, decision and 
 | 2026-10-10 | Plan | Seed currency, coordinates and prices are placeholders | replace with real local shops and prices in M04 |
 | 2026-10-19 | M00 | Empty `spm/core/__init__.py` created in M00 | import-linter needs the `spm.core` package to exist for its contract to run |
 | 2026-10-19 | M00 | Dependency lower bounds in `pyproject.toml`, exact pins in `uv.lock` | uv default; the lockfile is the source of exact versions |
+| 2026-10-22 | M01 | Added `BAD_REQUEST`, `METHOD_NOT_ALLOWED`, `PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE` to the §2.5 registry | M01 must return problems for 400/405/413/503, and the registry had no codes for them |
+| 2026-10-22 | M01 | Base `SpmError` created in M01 (`core/errors.py`); subclasses stay in M02 | the M01 exception handler needs the base class |
+| 2026-10-22 | M01 | Unhandled exceptions are caught by `UnhandledErrorMiddleware` (inside RequestID), not by an `Exception` handler | Starlette runs `Exception` handlers outside all user middleware, so the 500 would lose `X-Request-ID`, CORS headers and the log context |
+| 2026-10-22 | M01 | `/readyz` probes the URLs in settings with one-shot connections; an empty URL means "not configured" | the container has no DB/Redis clients until M03/M07; switch to the pooled clients then |
+| 2026-10-22 | M01 | `UuidV7Generator` lives in `spm/adapters/ids.py` | needs `uuid-utils` (stdlib has no UUIDv7 on 3.12), so it can't live in pure `core` |
+| 2026-10-22 | M02 | Enum members without an explicit value use their name as the value (`Verdict.HIGH = "HIGH"`, `Dimension.MASS = "MASS"`) | matches the M03 Postgres enum types and the M15 JSON (`"verdict": "HIGH"`) |
+| 2026-10-22 | M02 | `FixedClock` stays in `core/clock.py` (M01); `adapters/memory` re-exports it | one implementation; M01 placed it in core |
+| 2026-10-22 | M02 | `Event` (§3.1 envelope dataclass), `DailyStat` (M17 fields) and `OutboxRepo` (M07 signatures) are defined in full now; `SubscriptionRepo`, `AlertRepo` and `PriceCheckRepo` are empty placeholder Protocols | their shapes are already specified; the others aren't yet |
+| 2026-10-22 | M02 | `ERROR_TYPES` tuple in `core/errors.py`; `RateLimited` takes `retry_after_s` and the API sets `Retry-After` from it | single source for the code → class mapping; §2.5 says `RATE_LIMITED` sets `Retry-After` |
+| 2026-10-22 | M02 | mypy strict also covers `spm.ports`; mypy now checks `tests/`; a second import-linter contract keeps `spm.ports` free of adapters, frameworks and config | ports are pure interfaces, and adapter-vs-port conformance is checked statically in tests |
+| 2026-10-22 | M03 | The DEFAULT partition is named `reports_default`; `spm_ensure_report_partitions` returns the number created, takes an advisory lock, and moves rows already in `reports_default` into a newly created month before attaching it | attaching a partition fails if the default partition holds rows for that range; the lock serializes the migration and the nightly job |
+| 2026-10-22 | M03 | `0001_initial` runs the DDL one statement at a time; the downgrade keeps the `postgis` extension | asyncpg prepares each statement, so it rejects multi-statement strings; the extension is shared and created by `db-init.sql` |
+| 2026-10-22 | M03 | `tables.py` is checked against the migrated DB by an Alembic autogenerate diff (integration test) | the migration is the source of truth; the diff stops the metadata drifting |
+| 2026-10-22 | M03 | The container builds the engine and session factory when `SPM_DATABASE_URL` is set; `/readyz` uses the pooled engine for `db` | replaces the M01 one-shot DB probe, as planned in M01 |
+| 2026-10-22 | M03 | Test databases are cloned from `template_postgis` when it exists | `CREATE EXTENSION postgis` in an empty DB takes about 4 s; cloning takes about 1 s |
 
 ---
 

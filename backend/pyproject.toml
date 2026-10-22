@@ -19,6 +19,9 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
 ]
 
+[project.scripts]
+spm = "spm.entrypoints.cli:app"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -50,6 +53,12 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC"]
+# Greek letters are the domain notation: Beta(α, β) reputation, σ volatility.
+allowed-confusables = ["α", "β", "σ"]
+
+[tool.ruff.lint.per-file-ignores]
+# Migration DDL is copied verbatim from MODULES.md; keep its lines intact.
+"migrations/versions/*" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["spm"]
@@ -58,13 +67,13 @@ known-first-party = ["spm"]
 [tool.mypy]
 python_version = "3.12"
 mypy_path = "src"
-packages = ["spm"]
+files = ["src", "tests"]
 check_untyped_defs = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["spm.core.*", "spm.constants"]
+module = ["spm.core.*", "spm.constants", "spm.ports", "spm.ports.*"]
 strict = true
 
 # ---------------------------------------------------------------- pytest
@@ -106,4 +115,22 @@ forbidden_modules = [
     "spm.api",
     "spm.services",
     "spm.workers",
+]
+
+[[tool.importlinter.contracts]]
+name = "spm.ports are interfaces only (core types, no adapters or frameworks)"
+type = "forbidden"
+source_modules = ["spm.ports"]
+forbidden_modules = [
+    "sqlalchemy",
+    "redis",
+    "fastapi",
+    "boto3",
+    "httpx",
+    "spm.adapters",
+    "spm.api",
+    "spm.services",
+    "spm.workers",
+    "spm.container",
+    "spm.config",
 ]
