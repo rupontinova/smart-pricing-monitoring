@@ -80,3 +80,28 @@ async def test_run_consumers_until_sigterm(settings: Settings) -> None:
 async def test_run_consumers_needs_a_consumable_bus(settings: Settings) -> None:
     with pytest.raises(RuntimeError, match="can't consume"):
         await run_consumers(_container(settings, None), [])
+
+
+async def test_after_commit_runs_only_after_a_successful_commit() -> None:
+    uow = MemoryUnitOfWork()
+    ran: list[int] = []
+
+    async def handler(event: Event, _uow: MemoryUnitOfWork):  # type: ignore[no-untyped-def]
+        async def after() -> None:
+            ran.append(uow.commits)  # the commit already happened
+
+        return after
+
+    await idempotent("g", handler, uow_factory=lambda: uow, clock=CLOCK)(price_reported())
+    assert ran == [1]
+
+    async def failing(event: Event, _uow: MemoryUnitOfWork):  # type: ignore[no-untyped-def]
+        async def after() -> None:
+            ran.append(-1)
+
+        raise ConnectionError("before commit")
+        return after  # pragma: no cover
+
+    with pytest.raises(ConnectionError):
+        await idempotent("g2", failing, uow_factory=lambda: uow, clock=CLOCK)(price_reported())
+    assert ran == [1]

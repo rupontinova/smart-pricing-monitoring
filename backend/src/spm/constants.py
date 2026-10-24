@@ -47,7 +47,7 @@ LAST_SEEN_UPDATE_INTERVAL_H: Final = 1  # reporters.last_seen_at is written at m
 
 # M09 — robust statistics
 MAD_SCALE: Final = 1.4826  # MAD x this ~ standard deviation for normal data
-MAD_FLOOR_FRAC: Final = 0.02  # MAD_eff >= 2% of the center (grocery prices are often identical)
+MAD_FLOOR_FRAC: Final = 0.03  # MAD_eff >= 3% of the center (M14 tuning; plan: 0.02)
 HALF_LIFE_MIN_H: Final = 24
 HALF_LIFE_MAX_H: Final = 504  # 21 days
 HALF_LIFE_VOLATILITY_K: Final = 0.10  # half_life_days = K / sigma_daily
@@ -56,11 +56,38 @@ HALF_LIFE_MIN_RETURNS: Final = 10  # daily log returns needed to estimate volati
 # M10 — trust engine
 TRUST_PRIOR_ALPHA: Final = 1.0  # Beta(α, β) prior for a new reporter: trust 0.5
 TRUST_PRIOR_BETA: Final = 1.0
-HIGH_TRUST_MIN_SCORE: Final = 0.80
-HIGH_TRUST_MIN_EVIDENCE: Final = 10  # α + β − 2 ≥ this
+HIGH_TRUST_MIN_SCORE: Final = 0.90  # M14 tuning; plan: 0.80
+HIGH_TRUST_MIN_EVIDENCE: Final = 15  # α + β − 2 ≥ this (M14 tuning; plan: 10)
 NO_LOCATION_WEIGHT: Final = 0.5  # weight factor when the location is not verified
 AGREE_LOG_TOL: Final = 0.05  # |ln(p1/p2)| ≤ tol counts as agreement
 DISAGREE_LOG_TOL: Final = 0.10  # |ln(p1/p2)| > tol counts as contradiction
-CORROBORATION_MIN_H: Final = 6  # window W = max(6 h, 0.5 × half-life)
+CORROBORATION_MIN_H: Final = 48  # W = max(48 h, 0.5 × half-life) (M14 tuning; plan: 6)
 INDEPENDENCE_MIN_GAP_MIN: Final = 10  # same IP hash within 10 min → not independent
 Z_RESOLVE_NORMAL: Final = 2.0  # |z_market| ≤ this "agrees with the market"
+
+# M11 — anomaly classifier
+BOUNDS_LOW_MULT: Final = 0.2  # relative bounds vs the 90-day area median
+BOUNDS_HIGH_MULT: Final = 5.0
+BOUNDS_WINDOW_D: Final = 90
+BOUNDS_MIN_N: Final = 5
+Z_THRESHOLD: Final = 3.0
+SHOP_HISTORY_D: Final = 30
+SHOP_HISTORY_MIN_N: Final = 4
+MARKET_MIN_N: Final = 5
+MARKET_WINDOW_MIN_D: Final = 3  # market window = max(3 d, 2 × half-life)
+MARKET_SHIFT_WINDOW_H: Final = 24  # M14 tuning; plan: 48
+MARKET_SHIFT_MIN_SHOPS: Final = 3  # and ≥ 50% of the area's active shops
+
+# M12 — fair-price band & hot cache
+BAND_WINDOW_HALF_LIVES: Final = 4
+BAND_WINDOW_MAX_D: Final = 60
+BAND_MAX_SHOP_SHARE: Final = 0.40
+CONF_HIGH_WEIGHT: Final = 3.0
+CONF_MEDIUM: Final = 1.5
+CONF_LOW: Final = 0.5
+CONF_HIGH_MIN_SHOPS: Final = 3
+SHOP_PRICE_MIN_FRESHNESS: Final = 0.25  # shop price shown only if its age ≤ 2 half-lives
+CACHE_TTL_MIN_H: Final = 24  # hot-cache TTL = max(2 × half-life, 24 h)
+
+# M17 — maintenance (added early: the M14 simulator emulates the nightly auto-resolve)
+ANOMALY_AUTO_RESOLVE_D: Final = 7

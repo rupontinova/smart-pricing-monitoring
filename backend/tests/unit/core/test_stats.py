@@ -4,7 +4,7 @@ import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from spm.constants import HALF_LIFE_MAX_H, HALF_LIFE_MIN_H, MAD_SCALE
+from spm.constants import HALF_LIFE_MAX_H, HALF_LIFE_MIN_H, MAD_FLOOR_FRAC, MAD_SCALE
 from spm.core.stats import (
     cap_group_share,
     daily_log_returns,
@@ -147,7 +147,7 @@ def test_weighted_mad_uses_the_same_weights() -> None:
 
 
 def test_robust_z_uses_floor_when_mad_is_zero() -> None:
-    assert robust_z(85, 80, 0) == pytest.approx(5 / (1.4826 * 1.6))
+    assert robust_z(85, 80, 0) == pytest.approx(5 / (MAD_SCALE * MAD_FLOOR_FRAC * 80))
 
 
 def test_robust_z_uses_mad_above_floor() -> None:
@@ -215,6 +215,7 @@ def test_cap_no_op_cases() -> None:
     assert cap_group_share([5.0, 1.0], ["a", "a"], 0.40) == [5.0, 1.0]  # one group: nothing to do
     assert cap_group_share([5.0, 1.0], ["a", "b"], 1.0) == [5.0, 1.0]
     assert cap_group_share([], [], 0.4) == []
+    assert cap_group_share([0.0, 0.0], ["a", "b"], 0.4) == [0.0, 0.0]  # no weight: nothing to cap
     with pytest.raises(ValueError):
         cap_group_share([1.0], ["a", "b"], 0.4)
     with pytest.raises(ValueError):

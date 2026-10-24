@@ -6,6 +6,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from spm.constants import CORROBORATION_MIN_H
 from spm.core.enums import Classification
 from spm.core.models import Observation
 from spm.core.trust import (
@@ -51,10 +52,13 @@ def obs(
 
 # ---------------------------------------------------------------------------- reputation
 def test_trust_score_and_high_trust() -> None:
+    # Plan values (0.80 / 10) were tuned to 0.90 / 15 in M14: (11, 2) is no longer high trust.
     assert trust_score(1, 1) == 0.5
     assert not is_high_trust(9, 1)  # score 0.9 but only 8 pieces of evidence
-    assert is_high_trust(11, 2)  # 0.846, evidence 11
+    assert not is_high_trust(11, 2)  # 0.846, evidence 11
+    assert is_high_trust(19, 1)  # 0.95, evidence 18
     assert not is_high_trust(20, 10)  # plenty of evidence, score 0.667
+    assert not is_high_trust(14, 1)  # 0.933 but evidence 13 < HIGH_TRUST_MIN_EVIDENCE
 
 
 def test_report_weight_location_and_age() -> None:
@@ -65,8 +69,8 @@ def test_report_weight_location_and_age() -> None:
 
 
 def test_corroboration_window() -> None:
-    assert corroboration_window_h(48) == 24
-    assert corroboration_window_h(8) == 6  # floor
+    assert corroboration_window_h(336) == 168  # 0.5 × half-life
+    assert corroboration_window_h(48) == CORROBORATION_MIN_H  # floor
 
 
 # -------------------------------------------------------------------- agreement & independence

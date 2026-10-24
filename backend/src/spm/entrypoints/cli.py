@@ -60,24 +60,27 @@ def worker(
 
     from spm.container import build_container
     from spm.workers.runtime import ConsumerSpec, log_event, run_consumers
+    from spm.workers.scoring import consumer_specs
 
     settings = get_settings()
     configure_logging(settings)
-    specs: list[ConsumerSpec] = []  # business consumers register here from M13 on
-    if debug_log_events if debug_log_events is not None else settings.env == "local":
-        specs.append(ConsumerSpec("debug-log", log_event))
-    if not specs:
-        typer.echo("No consumers registered (use --debug-log-events to log events).")
-        return
+    log_events = debug_log_events if debug_log_events is not None else settings.env == "local"
 
     async def main() -> None:
         container = await build_container(settings)
         try:
+            specs = consumer_specs(container)
+            if log_events:
+                specs.append(ConsumerSpec("debug-log", log_event))
             await run_consumers(container, specs)
         finally:
             await container.close()
 
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError as exc:  # e.g. no database / Redis configured for scoring
+        typer.echo(f"Worker can't start: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
 
 @app.command()

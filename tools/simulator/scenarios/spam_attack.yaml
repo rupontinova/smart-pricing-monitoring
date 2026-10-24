@@ -1,0 +1,15 @@
+name: spam_attack
+description: >
+  One reporter fires 200 inflated onion reports at shop-b within an hour on day 10. The rate
+  limiter should stop all but the first 30; the rest must not move the band.
+days: 20
+seed: 5
+area: demo-central
+products: [onion, rice]
+true_price: { onion: 80, rice: 60 }
+daily_volatility: { onion: 0.02, rice: 0.005 }
+shop_premium: { shop-a: 0.00, shop-b: -0.03, shop-c: 0.02, shop-d: 0.00, shop-e: 0.04 }
+reporters:
+  honest:  { count: 30, noise_sigma: 0.02, reports_per_day: 0.6 }
+  spammer: { count: 1, day: 10, hours: 1, reports_per_hour: 200, inflate: 0.5, shop: shop-b, product: onion }
+location: { gps_rate: 0.8, accuracy_m: [10, 80] }

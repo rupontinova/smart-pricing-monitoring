@@ -120,7 +120,7 @@ def cap_group_share[G: Hashable](
     totals: dict[G, float] = defaultdict(float)
     for w, g in zip(weights, groups, strict=True):
         totals[g] += w
-    if max_share >= 1.0 or len(totals) < 2:
+    if max_share >= 1.0 or len(totals) < 2 or math.fsum(totals.values()) == 0:
         return list(weights)
 
     capped: set[G] = set()

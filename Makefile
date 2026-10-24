@@ -7,7 +7,7 @@ FRONTEND := frontend
 UV       := uv --directory $(BACKEND)
 SPM      := $(UV) run spm
 
-.PHONY: help setup up down migrate seed api worker scheduler web dev lint typecheck test test-int check sim
+.PHONY: help setup up down migrate seed api worker scheduler web dev lint typecheck test test-int check sim sim-all
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -47,9 +47,9 @@ dev: up migrate seed ## up + migrate + seed, then run api, worker, scheduler and
 	if [ -f $(FRONTEND)/package.json ]; then $(MAKE) web & fi; \
 	wait
 
-lint: ## ruff check + ruff format --check
-	$(UV) run ruff check .
-	$(UV) run ruff format --check .
+lint: ## ruff check + ruff format --check (backend + simulator)
+	$(UV) run ruff check . ../tools/simulator
+	$(UV) run ruff format --check . ../tools/simulator
 
 typecheck: ## mypy + import-linter
 	$(UV) run mypy
@@ -64,5 +64,11 @@ test-int: ## Integration + e2e tests (needs `make up`)
 
 check: lint typecheck test ## lint + typecheck + unit tests
 
-sim: ## Run the simulator & evaluation harness (M14)
-	$(UV) run python -m tools.simulator
+SCENARIO ?= onion_shock
+SIM := PYTHONPATH="$(CURDIR)/tools" $(UV) run python -m simulator
+
+sim: ## Replay one scenario and write its evaluation report (SCENARIO=onion_shock; needs `make up`)
+	$(SIM) $(SCENARIO)
+
+sim-all: ## Replay every scenario in tools/simulator/scenarios/
+	$(SIM) --all

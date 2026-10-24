@@ -109,9 +109,15 @@ class ReportService:
         *,
         request_id: str | None,
         allow_backfill: bool = False,
+        enforce_rate_limits: bool | None = None,
     ) -> SubmitResult:
+        """Rate limits apply unless backfilling; the simulator keeps them on for spam scenarios."""
+        if enforce_rate_limits is None:
+            enforce_rate_limits = not allow_backfill
         try:
-            result = await self._submit(reporter, cmd, request_id, allow_backfill)
+            result = await self._submit(
+                reporter, cmd, request_id, allow_backfill, enforce_rate_limits
+            )
         except SpmError as exc:
             self._count("reports_rejected", code=exc.code)
             raise
@@ -126,7 +132,12 @@ class ReportService:
         return SubmitResult(report, duplicate=True, state=state)
 
     async def _submit(
-        self, reporter: Reporter, cmd: SubmitReport, request_id: str | None, allow_backfill: bool
+        self,
+        reporter: Reporter,
+        cmd: SubmitReport,
+        request_id: str | None,
+        allow_backfill: bool,
+        enforce_rate_limits: bool,
     ) -> SubmitResult:
         # 1. Replay of the same client_report_id (offline retry): return the stored report.
         async with self._uow_factory() as uow:
@@ -142,7 +153,7 @@ class ReportService:
             cmd.observed_at,
             cmd.location,
             allow_backfill=allow_backfill,
-            enforce_rate_limits=not allow_backfill,
+            enforce_rate_limits=enforce_rate_limits,
         )
         if admission.duplicate_of is not None:
             return await self._existing(admission.duplicate_of)

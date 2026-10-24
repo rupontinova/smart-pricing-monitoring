@@ -166,12 +166,14 @@ class Anomaly:
 
 @dataclass(frozen=True, slots=True)
 class FairBand:
+    """The fair band for one product in one area. Quantiles are None when there is no data."""
+
     product_id: str
     area_id: str
-    p25: float
-    p50: float
-    p75: float
-    mad: float
+    p25: float | None
+    p50: float | None
+    p75: float | None
+    mad: float | None
     total_weight: float
     n_eff: float
     n_shops: int

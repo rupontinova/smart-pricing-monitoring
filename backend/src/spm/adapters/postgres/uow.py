@@ -1,8 +1,7 @@
 """``PgUnitOfWork``: one ``AsyncSession`` (one transaction) shared by every repository.
 
-Repository attributes are wired here as their repositories are built: ``reporters`` and
-``reports`` (M08), ``outbox`` and ``processed`` (M07), and the read parts of ``assessments`` and
-``bands`` that M08 needs (the rest arrives with scoring, M10 to M13).
+Wired so far: ``reporters``, ``reports``, ``assessments``, ``bands``, ``anomalies``, ``stats``,
+``outbox`` and ``processed``. ``subscriptions``, ``alerts`` and ``checks`` arrive with M15/M16.
 """
 
 from types import TracebackType
@@ -11,12 +10,14 @@ from typing import Self
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from spm.adapters.postgres.anomaly_repo import PgAnomalyRepo
 from spm.adapters.postgres.assessment_repo import PgAssessmentRepo
 from spm.adapters.postgres.band_repo import PgBandRepo
 from spm.adapters.postgres.outbox_repo import PgOutboxRepo
 from spm.adapters.postgres.processed_repo import PgProcessedEventRepo
 from spm.adapters.postgres.report_repo import PgReportRepo
 from spm.adapters.postgres.reporter_repo import PgReporterRepo
+from spm.adapters.postgres.stats_repo import PgStatsRepo
 
 
 class PgUnitOfWork:
@@ -36,6 +37,8 @@ class PgUnitOfWork:
         self.reports = PgReportRepo(self._session)
         self.assessments = PgAssessmentRepo(self._session)
         self.bands = PgBandRepo(self._session)
+        self.anomalies = PgAnomalyRepo(self._session)
+        self.stats = PgStatsRepo(self._session)
         self.outbox = PgOutboxRepo(self._session)
         self.processed = PgProcessedEventRepo(self._session)
         return self

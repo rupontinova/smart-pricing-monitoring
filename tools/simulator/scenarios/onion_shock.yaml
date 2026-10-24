@@ -1,0 +1,23 @@
+name: onion_shock
+description: >
+  Onion jumps 40% across the whole area over a day (day 20), and shop-c gouges eggs by 30% for
+  five days (day 30). A sloppy minority makes unit mistakes; two colluders inflate shop-a.
+days: 45
+seed: 42
+area: demo-central
+products: [onion, rice, eggs]
+true_price: { onion: 80, rice: 60, eggs: 150 }
+daily_volatility: { onion: 0.04, rice: 0.005, eggs: 0.015 }
+shop_premium: { shop-a: 0.00, shop-b: -0.03, shop-c: 0.02, shop-d: 0.00, shop-e: 0.04 }
+events:
+  - { day: 20, type: market_shock, product: onion, multiplier: 1.40, ramp_hours: 24 }
+  - { day: 30, type: shop_gouging, product: eggs, shop: shop-c, multiplier: 1.30, duration_days: 5 }
+reporters:
+  honest:    { count: 40, noise_sigma: 0.02, reports_per_day: 0.6 }
+  sloppy:    { count: 6,  noise_sigma: 0.03, unit_error_rate: 0.2 }
+  malicious: { count: 2,  inflate: 0.6, target_shop: shop-a }
+location: { gps_rate: 0.8, accuracy_m: [10, 80] }
+checks: { per_day: 30, quote_noise: 0.15 }
+targets:
+  shift_detect_within_h: 24
+  max_shift_anomalies_per_direction: 1

@@ -9,6 +9,7 @@ from spm.adapters.memory.events import (
     MemoryProcessedEventRepo,
 )
 from spm.adapters.memory.geo import MemoryShopGeoIndex
+from spm.adapters.memory.hot_cache import MemoryHotCache
 from spm.adapters.memory.ids import SequentialIds
 from spm.adapters.memory.metrics import MemoryMetrics, MetricCall
 from spm.adapters.memory.rate_limiter import MemoryRateLimiter
@@ -28,6 +29,7 @@ __all__ = [
     "MemoryBandRepo",
     "MemoryBus",
     "MemoryCatalogReader",
+    "MemoryHotCache",
     "MemoryMetrics",
     "MemoryOutboxRepo",
     "MemoryProcessedEventRepo",

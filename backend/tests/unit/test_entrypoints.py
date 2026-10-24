@@ -40,10 +40,16 @@ def test_cli_seed_rejects_invalid_seed_dir(tmp_path: Path) -> None:
     assert "Invalid seed files" in result.output
 
 
-def test_cli_worker_without_consumers_exits() -> None:
-    result = runner.invoke(cli.app, ["worker", "--no-debug-log-events"])
-    assert result.exit_code == 0
-    assert "No consumers registered" in result.output
+def test_cli_worker_without_database_exits_with_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SPM_DATABASE_URL", "")
+    monkeypatch.setenv("SPM_REDIS_URL", "")
+    get_settings.cache_clear()
+    try:
+        result = runner.invoke(cli.app, ["worker", "--no-debug-log-events"])
+    finally:
+        get_settings.cache_clear()
+    assert result.exit_code == 1
+    assert "Worker can't start" in result.output
 
 
 def test_lambda_handler_is_mangum() -> None:

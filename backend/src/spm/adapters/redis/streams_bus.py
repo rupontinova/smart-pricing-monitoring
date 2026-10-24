@@ -14,7 +14,9 @@ from typing import Any, cast
 
 import structlog
 from redis.asyncio import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from spm.adapters.redis.keys import EVENTS_DLQ_STREAM, EVENTS_STREAM
 from spm.constants import (
@@ -86,11 +88,22 @@ class RedisStreamsBus:
         await self.ensure_group(group)
         log.info("consumer_started", group=group, consumer=self.consumer_name, types=sorted(types))
         next_claim = time.monotonic()  # reclaim leftovers from a previous run right away
+        backoff_s = 0.5
         while not stop.is_set():
-            if time.monotonic() >= next_claim:
-                await self.reclaim(group, types, handler)
-                next_claim = time.monotonic() + self._claim_interval_s
-            entries = await self._read(group, stop)
+            try:
+                if time.monotonic() >= next_claim:
+                    await self.reclaim(group, types, handler)
+                    next_claim = time.monotonic() + self._claim_interval_s
+                entries = await self._read(group, stop)
+            except (RedisConnectionError, RedisTimeoutError) as exc:
+                # Transient: keep the consumer alive and retry (unACKed entries are reclaimed).
+                log.warning(
+                    "stream_read_failed", group=group, error=repr(exc), retry_in_s=backoff_s
+                )
+                await asyncio.sleep(backoff_s)
+                backoff_s = min(backoff_s * 2, 10.0)
+                continue
+            backoff_s = 0.5
             for entry_id, fields in entries:
                 await self._deliver(group, types, handler, entry_id, fields, deliveries=1)
 

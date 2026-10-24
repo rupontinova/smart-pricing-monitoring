@@ -1,7 +1,7 @@
 """In-memory reporters, reports, assessments and shop prices, and a unit of work over them."""
 
 import dataclasses
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -12,7 +12,8 @@ from uuid import UUID
 from spm.adapters.memory.events import MemoryOutboxRepo, MemoryProcessedEventRepo
 from spm.constants import LAST_SEEN_UPDATE_INTERVAL_H
 from spm.core.enums import Classification, ScoringState
-from spm.core.models import Report, Reporter, ShopPrice
+from spm.core.models import FairBand, Observation, Report, Reporter, ShopPrice
+from spm.core.trust import is_high_trust
 from spm.ports import DuplicateClientReport
 
 
@@ -57,6 +58,12 @@ class MemoryReporterRepo:
 
     async def trust_many(self, ids: Iterable[UUID]) -> dict[UUID, float]:
         return {i: self.by_id[i].trust for i in set(ids) if i in self.by_id}
+
+    async def high_trust_ids(self, ids: Iterable[UUID]) -> set[UUID]:
+        return {
+            i for i in set(ids)
+            if i in self.by_id and is_high_trust(self.by_id[i].alpha, self.by_id[i].beta)
+        }  # fmt: skip
 
     def ban(self, reporter_id: UUID) -> None:
         self.by_id[reporter_id] = dataclasses.replace(self.by_id[reporter_id], banned=True)
@@ -107,10 +114,44 @@ class MemoryReportRepo:
 
 
 class MemoryAssessmentRepo:
-    """Read side for report status; scoring writes arrive with M10 to M13."""
+    """Read side (status, observations); scoring writes arrive with M13."""
 
     def __init__(self, reports: MemoryReportRepo) -> None:
         self._reports = reports
+
+    def _observation(self, report: Report) -> Observation:
+        reporters = self._reports._reporters
+        reporter = reporters.by_id.get(report.reporter_id) if reporters else None
+        return Observation(
+            report_id=report.id,
+            reporter_id=report.reporter_id,
+            shop_id=report.shop_id,
+            norm_price=float(report.normalized.norm_price),
+            observed_at=report.observed_at,
+            trust=reporter.trust if reporter else 0.5,
+            location_verified=report.location_verified,
+            classification=self._reports.states[report.id][1],
+            ip_hash=report.ip_hash,
+        )
+
+    def _select(self, keep: Callable[[Report], bool], since: datetime) -> list[Observation]:
+        chosen = [r for r in self._reports.by_id.values() if keep(r) and r.observed_at >= since]
+        chosen.sort(key=lambda r: r.observed_at, reverse=True)
+        return [self._observation(r) for r in chosen]
+
+    async def observations_for_area(
+        self, product_id: str, area_id: str, since: datetime, exclude_shop: str | None = None
+    ) -> list[Observation]:
+        return self._select(
+            lambda r: r.product_id == product_id and r.area_id == area_id
+            and r.shop_id != exclude_shop,
+            since,
+        )  # fmt: skip
+
+    async def observations_for_shop(
+        self, product_id: str, shop_id: str, since: datetime
+    ) -> list[Observation]:
+        return self._select(lambda r: r.product_id == product_id and r.shop_id == shop_id, since)
 
     async def get_state(self, report_id: UUID) -> tuple[ScoringState, Classification | None]:
         try:
@@ -127,16 +168,37 @@ class MemoryAssessmentRepo:
 class MemoryBandRepo:
     def __init__(self) -> None:
         self.prices: dict[tuple[str, str], ShopPrice] = {}  # (product_id, shop_id)
+        self.bands: dict[tuple[str, str], FairBand] = {}  # (product_id, area_id)
+        self.rebases: dict[tuple[str, str], datetime] = {}
+
+    async def get_band(self, product_id: str, area_id: str) -> FairBand | None:
+        return self.bands.get((product_id, area_id))
+
+    async def upsert_band(self, band: FairBand) -> None:
+        self.bands[(band.product_id, band.area_id)] = band
+
+    async def get_rebase(self, product_id: str, area_id: str) -> datetime | None:
+        return self.rebases.get((product_id, area_id))
+
+    async def set_rebase(self, product_id: str, area_id: str, at: datetime) -> None:
+        self.rebases[(product_id, area_id)] = at
+
+    def _keys(self, product_id: str, area_id: str) -> list[tuple[str, str]]:
+        return [k for k, sp in self.prices.items() if k[0] == product_id and sp.area_id == area_id]
 
     async def shop_prices(self, product_id: str, area_id: str) -> list[ShopPrice]:
-        return [
-            sp
-            for (pid, _), sp in self.prices.items()
-            if pid == product_id and sp.area_id == area_id
-        ]
+        return [self.prices[k] for k in sorted(self._keys(product_id, area_id))]
 
     async def upsert_shop_price(self, sp: ShopPrice) -> None:
         self.prices[(sp.product_id, sp.shop_id)] = sp
+
+    async def replace_shop_prices(
+        self, product_id: str, area_id: str, prices: list[ShopPrice]
+    ) -> None:
+        for key in self._keys(product_id, area_id):
+            del self.prices[key]
+        for sp in prices:
+            self.prices[(sp.product_id, sp.shop_id)] = sp
 
 
 class MemoryUnitOfWork:

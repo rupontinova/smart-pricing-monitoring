@@ -137,3 +137,23 @@ async def test_uninteresting_types_are_acked_and_skipped(client: aioredis.Redis)
         await until(lambda: len(got) == 1)
     assert got[0].type == "price.reported"
     assert (await client.xpending(bus.stream, "metrics"))["pending"] == 0
+
+
+async def test_consumer_survives_read_timeouts(client: aioredis.Redis) -> None:
+    # A client whose socket timeout is SHORTER than the XREADGROUP block: reads time out.
+    flaky = aioredis.from_url(TEST_REDIS_URL, decode_responses=True, socket_timeout=0.2)
+    bus = RedisStreamsBus(flaky, consumer_name="c1", block_ms=500, claim_interval_s=60)
+    got: list[Event] = []
+
+    async def handle(event: Event) -> None:
+        got.append(event)
+
+    try:
+        async with consuming(bus, "scoring", handle):
+            await asyncio.sleep(1.0)  # several timed-out reads; the consumer must keep going
+            await RedisStreamsBus(client).publish([price_reported()])
+            fast = RedisStreamsBus(client, consumer_name="c2", block_ms=100, claim_interval_s=60)
+            async with consuming(fast, "scoring", handle):
+                await until(lambda: len(got) == 1)
+    finally:
+        await flaky.aclose()

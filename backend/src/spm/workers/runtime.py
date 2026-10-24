@@ -31,9 +31,12 @@ class IdempotentUnitOfWork(Protocol):
     async def commit(self) -> None: ...
 
 
+AfterCommit = Callable[[], Awaitable[None]]
+
+
 def idempotent[U: IdempotentUnitOfWork](
     consumer_name: str,
-    handler: Callable[[Event, U], Awaitable[None]],
+    handler: Callable[[Event, U], Awaitable[AfterCommit | None]],
     *,
     uow_factory: Callable[[], AbstractAsyncContextManager[U]],
     clock: Clock,
@@ -42,7 +45,8 @@ def idempotent[U: IdempotentUnitOfWork](
 
     The event is marked processed inside the handler's own transaction, before the handler runs:
     side effects and the mark commit (or roll back) together, and a concurrent duplicate delivery
-    blocks on the mark and then skips.
+    blocks on the mark and then skips. A handler may return an ``AfterCommit`` callback (e.g. to
+    publish outbox events or refresh a cache), which runs only once the commit succeeded.
     """
 
     async def wrapped(event: Event) -> None:
@@ -52,8 +56,10 @@ def idempotent[U: IdempotentUnitOfWork](
                 return
             if not await uow.processed.mark(consumer_name, event.id, clock.now()):
                 return  # another delivery committed first
-            await handler(event, uow)
+            after_commit = await handler(event, uow)
             await uow.commit()
+        if after_commit is not None:
+            await after_commit()
 
     return wrapped
 

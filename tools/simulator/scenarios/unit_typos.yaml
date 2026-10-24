@@ -1,0 +1,17 @@
+name: unit_typos
+description: >
+  A third of the crowd is sloppy: one in five of their reports has a quantity or unit mistake
+  (500 g paid but "1 kg" typed, 2 kg as 1 kg, grams for kilograms, per-piece eggs per dozen).
+days: 30
+seed: 3
+area: demo-central
+products: [onion, rice, eggs]
+true_price: { onion: 80, rice: 60, eggs: 150 }
+daily_volatility: { onion: 0.02, rice: 0.005, eggs: 0.01 }
+shop_premium: { shop-a: 0.00, shop-b: -0.03, shop-c: 0.02, shop-d: 0.00, shop-e: 0.04 }
+reporters:
+  honest: { count: 30, noise_sigma: 0.02, reports_per_day: 0.6 }
+  sloppy: { count: 15, noise_sigma: 0.03, reports_per_day: 0.6, unit_error_rate: 0.2 }
+location: { gps_rate: 0.8, accuracy_m: [10, 80] }
+targets:
+  bad_unit_recall_min: 0.90

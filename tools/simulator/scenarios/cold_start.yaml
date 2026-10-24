@@ -1,0 +1,14 @@
+name: cold_start
+description: >
+  A new deployment: eight reporters, ten days, no history. Shows how quickly bands gain
+  confidence and that sparse data doesn't raise false alarms.
+days: 10
+seed: 13
+area: demo-central
+products: [onion, rice, eggs]
+true_price: { onion: 80, rice: 60, eggs: 150 }
+daily_volatility: { onion: 0.02, rice: 0.005, eggs: 0.01 }
+shop_premium: { shop-a: 0.00, shop-b: -0.03, shop-c: 0.02, shop-d: 0.00, shop-e: 0.04 }
+reporters:
+  honest: { count: 8, noise_sigma: 0.02, reports_per_day: 0.6 }
+location: { gps_rate: 0.8, accuracy_m: [10, 80] }

@@ -8,9 +8,9 @@ from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from spm.adapters.postgres.migrate import downgrade, upgrade
+from spm.adapters.postgres.migrate import downgrade, recreate_database, upgrade
 from spm.adapters.postgres.tables import include_name, metadata
-from tests.integration.conftest import TEST_DATABASE_URL, recreate_database
+from tests.integration.conftest import TEST_DATABASE_URL
 
 pytestmark = pytest.mark.integration
 

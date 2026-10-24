@@ -26,11 +26,13 @@ from spm.adapters.redis.rate_limiter import RedisRateLimiter
 from spm.adapters.redis.streams_bus import RedisStreamsBus
 from spm.adapters.tokens import JwtTokens
 from spm.config import Settings
+from spm.constants import STREAM_BLOCK_MS
 from spm.core.clock import SystemClock
 from spm.ports import (
     Clock,
     EventConsumer,
     EventPublisher,
+    HotCache,
     IdGenerator,
     Metrics,
     RateLimiter,
@@ -55,8 +57,10 @@ class Container:
     uow_factory: Callable[[], Any] | None = None
     tokens: JwtTokens | None = None
     redis: "Redis | None" = None
+    stream_redis: "Redis | None" = None  # the event bus's own client (long blocking reads)
     catalog: CatalogCache | None = None
     shop_geo: ShopGeoIndex | None = None
+    hot_cache: HotCache | None = None
     rate_limiter: RateLimiter | None = None
     bus: EventPublisher | None = None
     consumer: EventConsumer | None = None  # None when the bus can't be consumed (EventBridge)
@@ -65,18 +69,19 @@ class Container:
 
     async def close(self) -> None:
         """Release connections held by adapters."""
-        if self.redis is not None:
-            await self.redis.aclose()
+        for client in (self.redis, self.stream_redis):
+            if client is not None:
+                await client.aclose()
         if self.db_engine is not None:
             await self.db_engine.dispose()
 
 
-def make_redis(url: str) -> "Redis":
+def make_redis(url: str, *, socket_timeout_s: float = REDIS_SOCKET_TIMEOUT_S) -> "Redis":
     return Redis.from_url(
         url,
         decode_responses=True,
         socket_connect_timeout=REDIS_CONNECT_TIMEOUT_S,
-        socket_timeout=REDIS_SOCKET_TIMEOUT_S,
+        socket_timeout=socket_timeout_s,
     )
 
 
@@ -100,7 +105,9 @@ async def build_container(settings: Settings) -> Container:
         )
     if settings.redis_url:
         container.redis = make_redis(settings.redis_url)
-        container.shop_geo = RedisHotCache(container.redis)
+        hot_cache = RedisHotCache(container.redis)
+        container.shop_geo = hot_cache
+        container.hot_cache = hot_cache
         container.rate_limiter = RedisRateLimiter(container.redis, container.clock)
     _build_bus(container)
     return container
@@ -116,7 +123,12 @@ def _build_bus(container: Container) -> None:
         if container.redis is None:
             log.warning("event_bus_unavailable", reason="SPM_EVENT_BUS=redis but no SPM_REDIS_URL")
             return
-        streams = RedisStreamsBus(container.redis)
+        # Its own client: XREADGROUP blocks for STREAM_BLOCK_MS, which must stay well below the
+        # socket timeout (with the shared 5 s timeout, idle reads timed out and killed the worker).
+        container.stream_redis = make_redis(
+            container.settings.redis_url, socket_timeout_s=STREAM_BLOCK_MS / 1000 + 10
+        )
+        streams = RedisStreamsBus(container.stream_redis)
         container.bus, container.consumer = streams, streams
     else:
         from spm.adapters.aws.eventbridge_bus import make_eventbridge_publisher

@@ -31,3 +31,6 @@ cdk.out/
 .DS_Store
 .idea/
 .vscode/
+
+# Simulator output (M14); a sample report is committed under doc/evaluation/
+tools/simulator/out/

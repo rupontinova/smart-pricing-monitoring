@@ -1,0 +1,19 @@
+name: egg_gouging
+description: >
+  shop-c charges 30% more for eggs for five days from day 20; the rest of the market is calm.
+days: 30
+seed: 11
+area: demo-central
+products: [eggs, rice]
+true_price: { eggs: 150, rice: 60 }
+daily_volatility: { eggs: 0.01, rice: 0.005 }
+shop_premium: { shop-a: 0.00, shop-b: -0.03, shop-c: 0.02, shop-d: 0.00, shop-e: 0.04 }
+product_weights: { eggs: 3, rice: 1 }
+events:
+  - { day: 20, type: shop_gouging, product: eggs, shop: shop-c, multiplier: 1.30, duration_days: 5 }
+reporters:
+  honest: { count: 40, noise_sigma: 0.02, reports_per_day: 0.6 }
+location: { gps_rate: 0.8, accuracy_m: [10, 80] }
+targets:
+  outlier_detect_within_h: 12
+  no_outlier_on_other_shops: true

@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+import pytest
+
 from spm.adapters.memory import (
     FixedClock,
     MemoryBus,
@@ -11,6 +13,8 @@ from spm.adapters.memory import (
     MemoryUnitOfWork,
     SequentialIds,
 )
+from spm.constants import RATE_LIMIT_PER_HOUR
+from spm.core.errors import RateLimited
 from spm.core.models import Reporter
 from spm.services.catalog_cache import CatalogCache
 from spm.services.guardrail_service import GuardrailService
@@ -67,3 +71,23 @@ async def test_publish_failure_still_accepts_the_report() -> None:
     assert not result.duplicate
     (row,) = uow.outbox.rows.values()
     assert row[1] is None  # unpublished: the sweeper will retry
+
+
+async def test_backfill_skips_rate_limits_unless_enforced() -> None:
+    uow, bus = MemoryUnitOfWork(), MemoryBus()
+    service = _service(uow, bus)
+    reporter = Reporter(uuid.uuid4(), "dev", 1, 1, 0, False, T0)
+    for _ in range(RATE_LIMIT_PER_HOUR + 5):
+        await service.submit(reporter, _cmd(uuid.uuid4()), request_id=None, allow_backfill=True)
+
+    spammer = Reporter(uuid.uuid4(), "spam", 1, 1, 0, False, T0)
+    for _ in range(RATE_LIMIT_PER_HOUR):
+        await service.submit(
+            spammer, _cmd(uuid.uuid4()), request_id=None, allow_backfill=True,
+            enforce_rate_limits=True,
+        )  # fmt: skip
+    with pytest.raises(RateLimited):
+        await service.submit(
+            spammer, _cmd(uuid.uuid4()), request_id=None, allow_backfill=True,
+            enforce_rate_limits=True,
+        )  # fmt: skip

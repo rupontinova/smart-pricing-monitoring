@@ -10,7 +10,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from spm.adapters.postgres.tables import reporters
-from spm.constants import LAST_SEEN_UPDATE_INTERVAL_H
+from spm.constants import (
+    HIGH_TRUST_MIN_EVIDENCE,
+    HIGH_TRUST_MIN_SCORE,
+    LAST_SEEN_UPDATE_INTERVAL_H,
+)
 from spm.core.models import Reporter
 
 
@@ -85,3 +89,17 @@ class PgReporterRepo:
             )
         )
         return {rid: float(a) / (float(a) + float(b)) for rid, a, b in rows.all()}
+
+    async def high_trust_ids(self, ids: Iterable[UUID]) -> set[UUID]:
+        wanted = list(set(ids))
+        if not wanted:
+            return set()
+        a, b = reporters.c.alpha, reporters.c.beta
+        rows = await self._session.execute(
+            select(reporters.c.id).where(
+                reporters.c.id.in_(wanted),
+                a / (a + b) >= HIGH_TRUST_MIN_SCORE,
+                a + b - 2 >= HIGH_TRUST_MIN_EVIDENCE,
+            )
+        )
+        return set(rows.scalars().all())

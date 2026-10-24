@@ -25,6 +25,10 @@ class HotCache(ShopGeoIndex, Protocol):
         self, area_id: str, product_id: str, max_price: float, limit: int
     ) -> list[ShopPrice]: ...
     async def shop_price(self, area_id: str, product_id: str, shop_id: str) -> ShopPrice | None: ...
+    async def put_snapshot(self, band: FairBand, prices: list[ShopPrice], ttl_s: int) -> bool:
+        """Write band and shop prices atomically, unless a newer band (later ``computed_at``)
+        is already cached. Returns whether it was written."""
+        ...
 
 
 class RateLimiter(Protocol):

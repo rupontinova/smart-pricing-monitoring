@@ -46,10 +46,10 @@
 | M08 | Device auth & `POST /v1/reports` | Write path | M06, M07 | ✅ Done 2026-10-22 |
 | M09 | Robust statistics library | Intelligence | M02 | ✅ Done 2026-10-22 |
 | M10 | Trust engine **(D)** | Intelligence | M09 | ✅ Done 2026-10-22 |
-| M11 | Anomaly classifier **(E)** | Intelligence | M10 | ⬜ |
-| M12 | Fair-price band & hot cache **(F, G)** | Intelligence | M11 | ⬜ |
-| M13 | Scoring worker (orchestration) | Intelligence | M08, M12 | ⬜ |
-| M14 | Simulator & evaluation harness | Intelligence | M13 | ⬜ |
+| M11 | Anomaly classifier **(E)** | Intelligence | M10 | ✅ Done 2026-10-22 |
+| M12 | Fair-price band & hot cache **(F, G)** | Intelligence | M11 | ✅ Done 2026-10-22 |
+| M13 | Scoring worker (orchestration) | Intelligence | M08, M12 | ✅ Done 2026-10-22 |
+| M14 | Simulator & evaluation harness | Intelligence | M13 | ✅ Done 2026-10-24 (shift-within-24 h target open, see notes) |
 | M15 | Read API: `/check` **(A)**, `/compare`, `/trends` | Read & delivery | M13 | ⬜ |
 | M16 | Subscriptions, alert dispatch & inbox | Read & delivery | M15 | ⬜ |
 | M17 | Daily rollups, maintenance, digest & scheduler | Read & delivery | M16 | ⬜ |
@@ -238,17 +238,17 @@ Every threshold lives here as a module-level `Final`, so tests and the simulator
 | `BASE_QUANTITY_MIN` / `_MAX` | `0.05` / `50` | M05 — in base units |
 | `FUZZY_MATCH_MIN_SCORE` | `85` | M05 |
 | `MAD_SCALE` | `1.4826` | M09 |
-| `MAD_FLOOR_FRAC` | `0.02` | M09 — MAD_eff ≥ 2% of the center (grocery prices are often identical) |
+| `MAD_FLOOR_FRAC` | `0.03` | M09 — MAD_eff ≥ 3% of the center (grocery prices are often identical). Plan `0.02`; tuned in M14 |
 | `HALF_LIFE_MIN_H` / `_MAX_H` | `24` / `504` (21 d) | M09 |
 | `HALF_LIFE_VOLATILITY_K` | `0.10` | M09 — half_life_days = K / σ_daily |
 | `HALF_LIFE_MIN_HISTORY_D` | `30` | M17 — before this, use the seed default |
 | `HALF_LIFE_MAX_DAILY_CHANGE` | `0.5` | M17 — ±50% per nightly update |
 | `TRUST_PRIOR_ALPHA` / `_BETA` | `1.0` / `1.0` | M10 |
-| `HIGH_TRUST_MIN_SCORE` | `0.80` | M10 |
-| `HIGH_TRUST_MIN_EVIDENCE` | `10` | M10 — α + β − 2 ≥ this |
+| `HIGH_TRUST_MIN_SCORE` | `0.90` | M10. Plan `0.80`; tuned in M14 |
+| `HIGH_TRUST_MIN_EVIDENCE` | `15` | M10 — α + β − 2 ≥ this. Plan `10`; tuned in M14 |
 | `AGREE_LOG_TOL` | `0.05` | M10 — \|ln(p1/p2)\| ≤ tol counts as agreement |
 | `DISAGREE_LOG_TOL` | `0.10` | M10 — \|ln(p1/p2)\| > tol counts as contradiction |
-| `CORROBORATION_MIN_H` | `6` | M10 — window W = max(6 h, 0.5 × half-life) |
+| `CORROBORATION_MIN_H` | `48` | M10 — window W = max(48 h, 0.5 × half-life). Plan `6`; tuned in M14 |
 | `INDEPENDENCE_MIN_GAP_MIN` | `10` | M10 — same IP hash within 10 min → not independent |
 | `BOUNDS_LOW_MULT` / `_HIGH_MULT` | `0.2` / `5.0` | M11 |
 | `BOUNDS_WINDOW_D` | `90` | M11 |
@@ -259,7 +259,7 @@ Every threshold lives here as a module-level `Final`, so tests and the simulator
 | `SHOP_HISTORY_MIN_N` | `4` | M11 |
 | `MARKET_MIN_N` | `5` | M11 |
 | `MARKET_WINDOW_MIN_D` | `3` | M11 — market window = max(3 d, 2 × half-life) |
-| `MARKET_SHIFT_WINDOW_H` | `48` | M11 |
+| `MARKET_SHIFT_WINDOW_H` | `24` | M11. Plan `48`; tuned in M14 |
 | `MARKET_SHIFT_MIN_SHOPS` | `3` | M11 — and ≥ 50% of the area's active shops |
 | `BAND_WINDOW_HALF_LIVES` | `4` | M12 |
 | `BAND_WINDOW_MAX_D` | `60` | M12 |
@@ -2095,6 +2095,43 @@ Every deviation from this document is recorded here: date, module, decision and 
 | 2026-10-22 | M10 | `verified_shop_price` counts unscored observations (classification `None`, e.g. the report being scored); the cluster's latest observation is chosen by `(observed_at, report_id)`; with all-zero weights the plain median is used; the price is returned even when not verified | the plan excludes only PENDING / BAD_REPORT / EXPIRED; deterministic tie-break; `weighted_median` raises on zero weight |
 | 2026-10-22 | M10 | `is_corroborated` returns `(True, supporting_ids)` with high trust too (the ids may be empty); `report_weight` treats negative trust as 0 | callers still get any agreeing ids; weights can't go negative |
 | 2026-10-22 | M10 | The auth service creates reporters with `TRUST_PRIOR_ALPHA/_BETA` | replaces M08's local placeholder |
+| 2026-10-22 | M11 | `ShiftEvidence` also carries `recent_prices`; `build_shift_evidence(obs_by_shop, now, *, recent_h=48, baseline_d=30)` uses the 30 days *before* the 48 h window as the baseline, unweighted, included labels only | step 5 must add the new report to its shop's recent set, which needs the raw prices; a baseline overlapping the recent window would dilute the shift |
+| 2026-10-22 | M11 | Step 5 direction: the report vs its own shop's baseline, else vs the market center; a shop counts when \|z\| > `Z_THRESHOLD` with the same sign; required count = `max(MARKET_SHIFT_MIN_SHOPS, ceil(0.5 × active_shops))` | the plan doesn't say what to use when the report's shop has no baseline |
+| 2026-10-22 | M11 | `classify` re-filters its inputs: shop history (NORMAL/SHOP_OUTLIER/MARKET_SHIFT, ≤ 30 d), market (NORMAL/MARKET_SHIFT, other shops, ≤ market window), corroboration (not BAD_REPORT/EXPIRED); unscored (`None`) observations are not evidence | a sloppy context from M13 can't skew the statistics |
+| 2026-10-22 | M11 | `insufficient_data` is set only by step 8 (NORMAL); earlier decisions report `False`; if all weights are 0 the centers fall back to unweighted median/MAD | a relative-bounds BAD_REPORT had 90-day data, so "insufficient" would mislead |
+| 2026-10-22 | M11 | Helper `market_window_h(half_life_h)` = `max(MARKET_WINDOW_MIN_D × 24, 2 × half-life)` is exported for M13 | one definition of the market window |
+| 2026-10-22 | M12 | `FairBand.p25/p50/p75/mad` are optional (None when the band has no observations) | the plan's "STALE with None quantiles" |
+| 2026-10-22 | M12 | New `BandRepo.replace_shop_prices` (delete the area's rows, multi-row insert) used by `recompute`; new `ReporterRepo.high_trust_ids` (SQL over α, β) | shops that went stale must disappear from Postgres too, or `get_or_rebuild` would bring them back; high trust needs α and β, not just the trust score |
+| 2026-10-22 | M12 | `compute_shop_prices`: `support_weight` = Σ report weights of the supporting cluster; `verified_at` = the cluster's latest `observed_at`; unverified → newest price with `n_reports = 1`; shops returned sorted by id | the plan doesn't define these fields |
+| 2026-10-22 | M12 | Zero total weight (all reporters at trust 0): quantiles are computed unweighted and confidence is STALE; `cap_group_share` now returns weights unchanged when they're all 0 (M09 bug: it crashed) | describe the data without claiming confidence |
+| 2026-10-22 | M12 | Shop-price hash values also carry `support_weight`; `put_band` replaces the whole hash (DEL + HSET + EXPIRE in one MULTI); `put_shop_prices` with an empty list just deletes both keys | the cache must round-trip a `ShopPrice`; no stale fields left behind |
+| 2026-10-22 | M12 | `get_or_rebuild(area_id, product_id) -> FairBand \| None`; on a miss it reloads band and shop prices from Postgres, re-filtering shop prices by freshness before caching them | the read path (M15) reads shop prices from the cache separately; Postgres may hold prices that have aged since the last recompute |
+| 2026-10-22 | M12 | `CACHE_TTL_MIN_H` = 24 constant; `hot_cache` field on the container (same `RedisHotCache` as `shop_geo`) | the plan's literal, per §2.7 |
+| 2026-10-22 | M13 | **M11 change:** `build_shift_evidence` counts PENDING reports in a shop's *recent* (48 h) set; the baseline stays NORMAL/SHOP_OUTLIER/MARKET_SHIFT | in real scoring a shock's first reports are uncorroborated (PENDING); excluding them made a market shift undetectable (the M11 fixtures had labelled them NORMAL) |
+| 2026-10-22 | M13 | The advisory lock is taken *before* the "already scored?" check | a concurrent duplicate can't score twice between the check and the lock |
+| 2026-10-22 | M13 | One area query (lookback `max(30 d + 48 h, market window, corroboration window)`) feeds shop history, market, same-shop recent and shift evidence; the 90-day median is a SQL `percentile_cont` over NORMAL/MARKET_SHIFT | fewer round trips; all slices come from one consistent snapshot |
+| 2026-10-22 | M13 | `idempotent` handlers may return an after-commit callback; scoring publishes outbox events and the cache snapshot there | step 11 needs flush/publish *after* the commit that `idempotent` performs |
+| 2026-10-22 | M13 | New `HotCache.put_snapshot` (band + shop prices in one Lua script, newer `computed_at` wins); `BandService.publish_to_cache` uses it | publishes after commit can arrive out of order; without the guard an older band could overwrite a newer one |
+| 2026-10-22 | M13 | `set_rebase(now − 48 h)` only when a MARKET_SHIFT anomaly is newly opened; anomalies without a reference price are not opened | one shift = one re-base (otherwise every shifted report would push the re-base forward); magnitude needs a reference |
+| 2026-10-22 | M13 | Reputation peers are same shop & product (unsettled, NORMAL/SHOP_OUTLIER/MARKET_SHIFT, within the corroboration window) | prices only need to agree within one shop |
+| 2026-10-22 | M13 | Daily rollups are for the report's area-local observation day; live upserts never overwrite a `final` row | correct under backfill; M17 owns finalized days |
+| 2026-10-22 | M13 | New `AssessmentRepo` methods `get_observation`, `unsettled_for_shop`, `resolve`, `mark_failed`; the scoring repos are Postgres-only (no memory versions) | the plan's tests are e2e on Postgres, as is the simulator |
+| 2026-10-22 | M13 | The event bus gets its own Redis client (socket timeout = block + 10 s) and the consumer retries transient Redis errors with backoff | with the shared 5 s socket timeout, an idle `XREADGROUP BLOCK 5000` timed out and killed the worker (found by running `make dev`) |
+| 2026-10-22 | M13 | `price_stats_daily` upsert renders `COALESCE(shop_id, '*')` with a literal | as a bind parameter the ON CONFLICT inference failed from the 6th execution of the prepared statement (Postgres generic plan) |
+| 2026-10-22 | M13 | Integration/e2e engine fixture is pooled (was `NullPool`) | each new connection cost ~100 ms through the Docker VM (e2e 252 s → 26 s); `NullPool` also hid the generic-plan bug above |
+| 2026-10-24 | M14 | **Tuned** `MAD_FLOOR_FRAC` 0.02 → 0.03 | with 2% reporting noise and ±4% shop premiums, a 2% floor let ~9% deviations score \|z\| > 3: honest reports at premium shops went PENDING and were "corroborated" by the next normal report (`baseline_quiet`: 2.0 false SHOP_OUTLIER per product per 30 d, target ≤ 1). At 0.03: 0. Ablation: with only the trust changes and 0.02 it stays at 2.0 |
+| 2026-10-24 | M14 | **Tuned** `HIGH_TRUST_MIN_SCORE` 0.80 → 0.90, `HIGH_TRUST_MIN_EVIDENCE` 10 → 15 | sloppy reporters (20% unit slips) reached high trust (9 of 15 in `unit_typos`), and a high-trust report confirms a SHOP_OUTLIER alone: 11 of 14 slips classified SHOP_OUTLIER came that way, never penalized. Honest reporters average 0.93, sloppy 0.82 |
+| 2026-10-24 | M14 | **Tuned** `CORROBORATION_MIN_H` 6 → 48 | at ~2 reports per shop and product per day, with shops closed overnight, a 24 h window (onion: 0.5 × 48 h) often closed before the shop's next report: every EXPIRED slip in `unit_typos` was onion, next report 24–40 h later. Products with half-life ≥ 96 h are unchanged |
+| 2026-10-24 | M14 | **Tuned** `MARKET_SHIFT_WINDOW_H` 48 → 24 | a 48 h recent window mixes pre-shock reports into each shop's median: `onion_shock` detection 54 h (48) vs 35 h (24); no extra false shifts in `baseline_quiet`. The re-base point follows the constant |
+| 2026-10-24 | M14 | `SHOP_HISTORY_D` tried at 7, kept at 30 | the shift baseline's MAD reflects price drift, not day-to-day noise; a 7-day baseline barely helped (43.6 → 41.8 h) and changes z_shop for every product |
+| 2026-10-24 | M14 | **Target not met:** `onion_shock` MARKET_SHIFT within 24 h | under the scenario's 4%/day onion volatility, 30-day shop baselines have MAD 4–6 (×1.4826 × 3 → a ~25% move needed); a 40% shock ramping over 24 h reaches that the next morning (full scenario 41 h; ~44 h at 3 reports/shop/day). Constants can't fix it without false alarms; it needs a volatility-scaled shift test (scale by the MAD of daily returns, not of levels). Kept as a strict `xfail` plus a passing ≤ 48 h guard; decision left to the user |
+| 2026-10-24 | M14 | Simulator emulates M17 maintenance nightly (expire PENDING, auto-resolve anomalies after `ANOMALY_AUTO_RESOLVE_D`, clear `rebase_at`) | without it a day-5 MARKET_SHIFT anomaly stayed open and dedup-blocked the day-20 shock; `ANOMALY_AUTO_RESOLVE_D` added to `constants.py` early. Replace with the real job in M17 |
+| 2026-10-24 | M14 | Scenario days are area-local days; events have a local `time` (shock 00:00, gouging 08:00, spam 10:00) | wholesale shocks move prices overnight and gouging starts when a shop opens; with UTC days a "day 20" shock began at 06:00 Dhaka and ramped through opening hours |
+| 2026-10-24 | M14 | Evaluation: rejected, duplicate and OPEN (PENDING with its window past the run's end) reports are outside precision/recall; "≤ 1 MARKET_SHIFT per product per direction" counts anomalies attributed to the shock | rejected reports never get a label; an OPEN report has no verdict yet; unrelated shifts are reported as false alarms rather than counted twice |
+| 2026-10-24 | M14 | `ReportService.submit(enforce_rate_limits=None)` | backfill skips rate limits by default; the simulator keeps them on so `spam_attack` exercises the limiter |
+| 2026-10-24 | M14 | In-process replay gives the catalog cache its own frozen clock | the simulated clock jumps hours between reports, so the cache reloaded the catalog (5 queries) on almost every report |
+| 2026-10-24 | M14 | `recreate_database` moved from the test conftest to `spm.adapters.postgres.migrate` | the simulator recreates its own `spm_sim` database |
+| 2026-10-24 | M14 | Simulator is the `simulator` package in `tools/simulator/` (on `PYTHONPATH`), linted and type-checked with the backend | the plan's `python -m tools.simulator` needs the repo root on the path; uv runs in `backend/` |
 
 ---
 

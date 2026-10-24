@@ -9,53 +9,22 @@ from collections.abc import AsyncIterator
 
 import pytest
 import redis.asyncio as aioredis
-from sqlalchemy import make_url, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
 
 from spm.adapters.postgres.db import make_session_factory
-from spm.adapters.postgres.migrate import upgrade
+from spm.adapters.postgres.migrate import recreate_database, upgrade
 from spm.adapters.postgres.tables import metadata
 
 TEST_DATABASE_URL = os.environ.get(
     "SPM_TEST_DATABASE_URL", "postgresql+asyncpg://spm:spm@localhost:5433/spm_test"
 )
 TEST_REDIS_URL = os.environ.get("SPM_TEST_REDIS_URL", "redis://localhost:6380/15")
-
-
-async def recreate_database(url: str) -> None:
-    """DROP + CREATE the database (via the maintenance db ``spm``) with PostGIS enabled.
-
-    Clones ``template_postgis`` (shipped by the postgis image) when present: ~10x faster than
-    ``CREATE EXTENSION postgis`` in an empty database.
-    """
-    target = make_url(url)
-    admin = create_async_engine(
-        target.set(database="spm"), isolation_level="AUTOCOMMIT", poolclass=NullPool
-    )
-    try:
-        async with admin.connect() as conn:
-            has_template = (
-                await conn.execute(
-                    text("SELECT 1 FROM pg_database WHERE datname = 'template_postgis'")
-                )
-            ).scalar()
-            template = " TEMPLATE template_postgis" if has_template else ""
-            await conn.execute(text(f'DROP DATABASE IF EXISTS "{target.database}" WITH (FORCE)'))
-            await conn.execute(text(f'CREATE DATABASE "{target.database}"{template}'))
-    finally:
-        await admin.dispose()
-    engine = create_async_engine(url, poolclass=NullPool)
-    try:
-        async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
-    finally:
-        await engine.dispose()
 
 
 @pytest.fixture(scope="session")
@@ -68,7 +37,9 @@ def database_url() -> str:
 
 @pytest.fixture
 async def engine(database_url: str) -> AsyncIterator[AsyncEngine]:
-    engine = create_async_engine(database_url, poolclass=NullPool)
+    # Pooled like production: a fresh connection costs ~100 ms through the Docker VM, a pooled
+    # checkout ~4 ms. Overflow lets the concurrency tests open many sessions at once.
+    engine = create_async_engine(database_url, pool_size=5, max_overflow=25)
     yield engine
     await engine.dispose()
 

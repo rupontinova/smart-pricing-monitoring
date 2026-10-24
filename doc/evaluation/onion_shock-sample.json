@@ -1,0 +1,257 @@
+{
+  "scenario": "onion_shock",
+  "mode": "inprocess",
+  "seed": 42,
+  "days": 45,
+  "generated": 1282,
+  "accepted": 1269,
+  "duplicates": 9,
+  "rejected": 4,
+  "elapsed_s": 67.66,
+  "dead_letters": 0,
+  "truth_counts": {
+    "normal": 1161,
+    "malicious": 60,
+    "bad_unit": 35,
+    "market_shift": 17,
+    "shop_outlier": 9
+  },
+  "confusion": {
+    "normal": {
+      "NORMAL": 1121,
+      "PENDING": 0,
+      "SHOP_OUTLIER": 5,
+      "MARKET_SHIFT": 31,
+      "BAD_REPORT": 0,
+      "EXPIRED": 1,
+      "OPEN": 0,
+      "REJECTED": 0,
+      "DUPLICATE": 3,
+      "UNSCORED": 0
+    },
+    "bad_unit": {
+      "NORMAL": 0,
+      "PENDING": 0,
+      "SHOP_OUTLIER": 0,
+      "MARKET_SHIFT": 1,
+      "BAD_REPORT": 26,
+      "EXPIRED": 4,
+      "OPEN": 0,
+      "REJECTED": 4,
+      "DUPLICATE": 0,
+      "UNSCORED": 0
+    },
+    "malicious": {
+      "NORMAL": 1,
+      "PENDING": 0,
+      "SHOP_OUTLIER": 13,
+      "MARKET_SHIFT": 1,
+      "BAD_REPORT": 37,
+      "EXPIRED": 1,
+      "OPEN": 1,
+      "REJECTED": 0,
+      "DUPLICATE": 6,
+      "UNSCORED": 0
+    },
+    "shop_outlier": {
+      "NORMAL": 0,
+      "PENDING": 0,
+      "SHOP_OUTLIER": 9,
+      "MARKET_SHIFT": 0,
+      "BAD_REPORT": 0,
+      "EXPIRED": 0,
+      "OPEN": 0,
+      "REJECTED": 0,
+      "DUPLICATE": 0,
+      "UNSCORED": 0
+    },
+    "market_shift": {
+      "NORMAL": 1,
+      "PENDING": 0,
+      "SHOP_OUTLIER": 9,
+      "MARKET_SHIFT": 6,
+      "BAD_REPORT": 0,
+      "EXPIRED": 1,
+      "OPEN": 0,
+      "REJECTED": 0,
+      "DUPLICATE": 0,
+      "UNSCORED": 0
+    }
+  },
+  "scores": [
+    {
+      "label": "NORMAL",
+      "predicted": 1123,
+      "actual": 1158,
+      "correct": 1121,
+      "precision": 0.9982190560997328,
+      "recall": 0.968048359240069
+    },
+    {
+      "label": "BAD_REPORT",
+      "predicted": 63,
+      "actual": 84,
+      "correct": 63,
+      "precision": 1.0,
+      "recall": 0.75
+    },
+    {
+      "label": "SHOP_OUTLIER",
+      "predicted": 36,
+      "actual": 9,
+      "correct": 9,
+      "precision": 0.25,
+      "recall": 1.0
+    },
+    {
+      "label": "MARKET_SHIFT",
+      "predicted": 39,
+      "actual": 17,
+      "correct": 6,
+      "precision": 0.15384615384615385,
+      "recall": 0.35294117647058826
+    }
+  ],
+  "bad_unit_recall": 0.8387096774193549,
+  "events": [
+    {
+      "label": "market_shock onion \u00d71.4 (day 20, 00:00)",
+      "expected_kind": "MARKET_SHIFT",
+      "product": "onion",
+      "shop": null,
+      "start": "2026-01-24 18:00:00+00:00",
+      "detected": true,
+      "time_to_detect_h": 41.04621443638889,
+      "alerts": 4,
+      "expected_kind_alerts": 1
+    },
+    {
+      "label": "shop_gouging eggs@shop-c \u00d71.3 (day 30, 08:00, 5 d)",
+      "expected_kind": "SHOP_OUTLIER",
+      "product": "eggs",
+      "shop": "shop-c",
+      "start": "2026-02-04 02:00:00+00:00",
+      "detected": true,
+      "time_to_detect_h": 5.051390384166667,
+      "alerts": 1,
+      "expected_kind_alerts": 1
+    }
+  ],
+  "false_alarms": [
+    {
+      "kind": "MARKET_SHIFT",
+      "product": "rice",
+      "shop": null,
+      "direction": "up",
+      "detected_at": "2026-01-08 13:08:13.163015+00:00",
+      "cause": "bad_data"
+    },
+    {
+      "kind": "MARKET_SHIFT",
+      "product": "onion",
+      "shop": null,
+      "direction": "up",
+      "detected_at": "2026-01-10 15:27:04.775972+00:00",
+      "cause": "noise"
+    },
+    {
+      "kind": "SHOP_OUTLIER",
+      "product": "onion",
+      "shop": "shop-b",
+      "direction": "up",
+      "detected_at": "2026-01-11 09:18:26.883998+00:00",
+      "cause": "noise"
+    },
+    {
+      "kind": "SHOP_OUTLIER",
+      "product": "rice",
+      "shop": "shop-a",
+      "direction": "up",
+      "detected_at": "2026-01-15 09:21:19.266737+00:00",
+      "cause": "bad_data"
+    },
+    {
+      "kind": "SHOP_OUTLIER",
+      "product": "rice",
+      "shop": "shop-a",
+      "direction": "up",
+      "detected_at": "2026-01-24 10:14:35.433539+00:00",
+      "cause": "bad_data"
+    },
+    {
+      "kind": "SHOP_OUTLIER",
+      "product": "rice",
+      "shop": "shop-a",
+      "direction": "up",
+      "detected_at": "2026-02-03 05:56:38.512181+00:00",
+      "cause": "bad_data"
+    },
+    {
+      "kind": "SHOP_OUTLIER",
+      "product": "eggs",
+      "shop": "shop-e",
+      "direction": "up",
+      "detected_at": "2026-02-09 03:17:12.049856+00:00",
+      "cause": "noise"
+    },
+    {
+      "kind": "SHOP_OUTLIER",
+      "product": "onion",
+      "shop": "shop-b",
+      "direction": "down",
+      "detected_at": "2026-02-12 05:03:25.452535+00:00",
+      "cause": "noise"
+    }
+  ],
+  "false_outliers_per_product_per_30d": {
+    "onion": 1.3333333333333333,
+    "rice": 2.0,
+    "eggs": 0.6666666666666666
+  },
+  "band_mape": 0.02707782182852279,
+  "band_mape_by_product": {
+    "onion": 0.04160681596118475,
+    "rice": 0.01072183082106934,
+    "eggs": 0.028904818703314288
+  },
+  "band_coverage": 1.0,
+  "band_warmup_days": 3,
+  "freshness": {
+    "onion": {
+      "median_band_mean_age_h": 48.08140182495117,
+      "median_newest_report_age_h": 3.3311398616666668
+    },
+    "rice": {
+      "median_band_mean_age_h": 220.5474853515625,
+      "median_newest_report_age_h": 2.718949080833333
+    },
+    "eggs": {
+      "median_band_mean_age_h": 133.34373474121094,
+      "median_newest_report_age_h": 3.2953550436111114
+    }
+  },
+  "rejections": {
+    "QUANTITY_OUT_OF_RANGE": 4
+  },
+  "anomalies_by_kind": {
+    "MARKET_SHIFT": 3,
+    "SHOP_OUTLIER": 10
+  },
+  "targets": [
+    {
+      "name": "shift_time_to_detect_h",
+      "description": "MARKET_SHIFT detected within (h of the shock start)",
+      "value": 41.04621443638889,
+      "threshold": 24.0,
+      "passed": false
+    },
+    {
+      "name": "shift_anomalies_per_shock",
+      "description": "MARKET_SHIFT anomalies per shock (product, direction) \u2264",
+      "value": 1.0,
+      "threshold": 1.0,
+      "passed": true
+    }
+  ],
+  "passed": false
+}
